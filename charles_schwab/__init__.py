@@ -149,7 +149,12 @@ def _remaining_shares(bought: List[pd.Series]):
     )
 
 
-def main() -> None:
+def charles_schwab() -> None:
+    parser = ArgumentParser(add_help=False)
+    parser.add_argument("cmd", choices=["summarize"])
+    args, rest = parser.parse_known_args()
+    if args.cmd != "summarize":
+        raise ValueError(f"Invalid cmd: {args.cmd}!")
     parser = ArgumentParser()
     parser.add_argument(
         "path", type=Path, help="Path to the charles-schwab csv file."
@@ -160,7 +165,7 @@ def main() -> None:
         default=datetime.now().year,
         help="Taxing year (default: %(default)s).",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(rest)
     with open(args.path, "r") as stream:
         next(stream)
         lines = [
@@ -263,4 +268,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    charles_schwab()
