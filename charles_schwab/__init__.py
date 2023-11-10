@@ -1,3 +1,4 @@
+import os
 from argparse import ArgumentParser
 from collections import defaultdict
 from datetime import datetime
@@ -7,23 +8,11 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+import yaml
 
-EXCHANGE_RATES = {
-    "2023-10-03": 4.3634,
-    "2023-09-21": 4.3501,
-    "2023-09-20": 4.3472,
-    "2023-09-05": 4.1353,
-    "2023-08-31": 4.1167,
-    "2023-06-14": 4.1439,
-    "2023-05-30": 4.2234,
-    "2023-05-22": 4.2053,
-    "2023-05-08": 4.1612,
-    "2023-04-04": 4.3168,
-    "2023-03-17": 4.4248,
-    "2023-03-01": 4.4475,
-    "2023-02-28": 4.4697,
-    "2022-08-31": 4.721,
-}
+CONFIG_PATH = Path(os.path.dirname(__file__)) / "config.yaml"
+with open(CONFIG_PATH, "r") as stream:
+    CONFIG = yaml.safe_load(stream)
 
 
 class Format(Enum):
@@ -52,7 +41,9 @@ def _sell_espp(
 ) -> float:
     date = row["Date"]
     exchange_rate = row["USD-PLN"]
-    assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
+    assert pd.notnull(
+        exchange_rate
+    ), f"Provide the exchange rate for {date.strftime('%Y-%m-%d')} in {CONFIG_PATH}!"
     for _ in range(row["Shares"]):
         bought_row = bought.pop(0)
         formatting = getattr(Format, bought_row["Description"]).value
@@ -236,7 +227,7 @@ def charles_schwab() -> None:
         .astype(float)
     )
     df["USD-PLN"] = df["Date"].apply(
-        lambda x: EXCHANGE_RATES.get(x.strftime("%Y-%m-%d"), None)
+        lambda x: CONFIG["exchange_rates"].get(x.strftime("%Y-%m-%d"), None)
     )
     df[df.select_dtypes(object).columns] = df.select_dtypes(object).applymap(
         lambda x: x or np.nan
