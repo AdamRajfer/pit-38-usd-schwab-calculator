@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from collections import defaultdict
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List
@@ -25,9 +26,9 @@ EXCHANGE_RATES = {
 }
 
 
-class ShareType(Enum):
-    ESPP = "[\033[38;5;208mESPP\033[0m]"
-    RS = "[\033[35mRS\033[0m]"
+class Format(Enum):
+    ESPP = "\033[38;5;208m"
+    RS = "\033[35m"
 
 
 def _buy_espp(row: pd.Series, bought: List[pd.Series]) -> None:
@@ -38,32 +39,33 @@ def _buy_espp(row: pd.Series, bought: List[pd.Series]) -> None:
         bought.append(row)
     bought_pln = row["Purchase Price"] * row["USD-PLN"] * row["Quantity"]
     print(
-        f"Buying {row['Quantity']} {ShareType.ESPP.value} shares",
+        f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
+        f"{row['Action']} {Format.ESPP.value}{row['Quantity']} ESPP shares\033[0m",
         f"for {bought_pln:.2f} PLN.",
         f"Remaining {len(bought)} shares.",
     )
 
 
 def _sell_espp(
-    row: pd.Series, bought: List[pd.Series], total_tax: float
+    row: pd.Series, bought: List[pd.Series], total_tax: float, year: int
 ) -> float:
     date = row["Date"]
     exchange_rate = row["USD-PLN"]
     assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
     for _ in range(row["Shares"]):
         bought_row = bought.pop(0)
-        source = getattr(ShareType, bought_row["Description"]).value
+        formatting = getattr(Format, bought_row["Description"]).value
         sold_pln = row["Sale Price"] * row["USD-PLN"]
         bought_pln = bought_row["Purchase Price"] * bought_row["USD-PLN"]
         tax = (sold_pln - bought_pln) * 0.19
-        total_tax += tax
+        total_tax += tax if date.year == year else 0.0
         print(
-            f"Selling 1 {source} share",
-            f"for {sold_pln:.2f} PLN.",
+            f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
+            f"{row['Action']} {formatting}1 {bought_row['Description']} share\033[0m",
+            f"for {sold_pln:.2f} PLN",
             f"bought for {bought_pln:.2f} PLN.",
             f"Remaining {len(bought)} shares.",
-            f"Tax {tax:.2f} PLN.",
-            f"Total tax \033[1;31m{total_tax:.2f} PLN\033[0m.",
+            f"Total tax for {year} \033[1;31m{total_tax:.2f} PLN\033[0m.",
         )
     return total_tax
 
@@ -72,36 +74,81 @@ def _buy_rs(row: pd.Series, bought: List[pd.Series]) -> None:
     for _ in range(row["Quantity"]):
         bought.append(row)
     print(
-        f"Vesting {row['Quantity']} {ShareType.RS.value} shares",
+        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+        f"{row['Action']} {Format.RS.value}{row['Quantity']} RS shares\033[0m.",
         f"Remaining {len(bought)} shares.",
     )
 
 
 def _sell_rs(
-    row: pd.Series, bought: List[pd.Series], total_tax: float
+    row: pd.Series, bought: List[pd.Series], total_tax: float, year: int
 ) -> float:
     date = row["Date"]
     exchange_rate = row["USD-PLN"]
     assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
     for _ in range(row["Shares"]):
         bought_row = bought.pop(0)
-        source = getattr(ShareType, bought_row["Description"]).value
+        formatting = getattr(Format, bought_row["Description"]).value
         sold_pln = row["Sale Price"] * row["USD-PLN"]
         tax = sold_pln * 0.19
-        total_tax += tax
+        total_tax += tax if date.year == year else 0.0
         print(
-            f"Selling 1 {source} share",
+            f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
+            f"{row['Action']} {formatting}1 {bought_row['Description']} share\033[0m",
             f"for {sold_pln:.2f} PLN.",
-            f"Remaining {len(bought)} shares.",
-            f"Tax {tax:.2f} PLN.",
-            f"Total tax \033[1;31m{total_tax:.2f} PLN\033[0m.",
+            f"Remaining \033[1;34m{len(bought)} shares\033[0m.",
+            f"Total tax for {year} \033[1;31m{total_tax:.2f} PLN\033[0m.",
         )
     return total_tax
+
+
+def _transferr_cash(row: pd.Series) -> None:
+    print(
+        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+        f"{row['Action']} \033[1;32m{-row['Amount']:.2f} USD\033[0m.",
+        f"Included fees and commissions {-row['Fees & Commissions']:.2f} USD.",
+    )
+
+
+def _debit(row: pd.Series) -> None:
+    print(
+        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+        f"{row['Action']} \033[1;31m{-row['Amount']:.2f} USD\033[0m.",
+    )
+
+
+def _credit(row: pd.Series) -> None:
+    print(
+        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+        f"{row['Action']} \033[1;32m{row['Amount']:.2f} USD\033[0m.",
+    )
+
+
+def _rs_lapse(row: pd.Series) -> None:
+    print(
+        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+        f"{row['Action']} {row['Quantity']} {row['Description']}.",
+    )
+
+
+def _total_tax(total_tax: float, year: int):
+    print(
+        f"[\033[1;37m{year}\033[0m]",
+        f"Total tax \033[1;31m{total_tax:.2f} PLN\033[0m.",
+    )
+
+
+def _remaining_shares(bought: List[pd.Series]):
+    print(
+        f"[\033[1;37m{datetime.now().year}\033[0m]",
+        f"Remaining \033[1;34m{len(bought)} shares\033[0m.",
+    )
 
 
 def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("path", type=Path)
+    parser.add_argument("--year", required=True, type=int)
     args = parser.parse_args()
     with open(args.path, "r") as stream:
         next(stream)
@@ -184,12 +231,24 @@ def main() -> None:
     for _, row in df[::-1].iterrows():
         if row["Description"] == "ESPP":
             _buy_espp(row, bought)
-        if row["Type"] == "ESPP":
-            total_tax = _sell_espp(row, bought, total_tax)
-        if row["Description"] == "RS":
+        elif row["Type"] == "ESPP":
+            total_tax = _sell_espp(row, bought, total_tax, args.year)
+        elif row["Description"] == "RS":
             _buy_rs(row, bought)
-        if row["Type"] == "RS":
-            total_tax = _sell_rs(row, bought, total_tax)
+        elif row["Type"] == "RS":
+            total_tax = _sell_rs(row, bought, total_tax, args.year)
+        elif row["Description"] == "Cash Disbursement":
+            _transferr_cash(row)
+        elif row["Description"] == "Debit":
+            _debit(row)
+        elif row["Description"] == "Credit":
+            _credit(row)
+        elif row["Description"] == "Restricted Stock Lapse":
+            _rs_lapse(row)
+        else:
+            raise ValueError(f"Unknown description: {row['Description']}!")
+    _total_tax(total_tax, args.year)
+    _remaining_shares(bought)
 
 
 if __name__ == "__main__":
