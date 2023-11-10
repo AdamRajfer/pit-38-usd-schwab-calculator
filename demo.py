@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
 from collections import defaultdict
+from enum import Enum
 from pathlib import Path
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -23,7 +25,81 @@ EXCHANGE_RATES = {
 }
 
 
-def main():
+class ShareType(Enum):
+    ESPP = "[\033[38;5;208mESPP\033[0m]"
+    RS = "[\033[35mRS\033[0m]"
+
+
+def _buy_espp(row: pd.Series, bought: List[pd.Series]) -> None:
+    date = row["Date"]
+    exchange_rate = row["USD-PLN"]
+    assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
+    for _ in range(row["Quantity"]):
+        bought.append(row)
+    bought_pln = row["Purchase Price"] * row["USD-PLN"] * row["Quantity"]
+    print(
+        f"Buying {row['Quantity']} {ShareType.ESPP.value} shares",
+        f"for {bought_pln:.2f} PLN.",
+        f"Remaining {len(bought)} shares.",
+    )
+
+
+def _sell_espp(
+    row: pd.Series, bought: List[pd.Series], total_tax: float
+) -> float:
+    date = row["Date"]
+    exchange_rate = row["USD-PLN"]
+    assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
+    for _ in range(row["Shares"]):
+        bought_row = bought.pop(0)
+        source = getattr(ShareType, bought_row["Description"]).value
+        sold_pln = row["Sale Price"] * row["USD-PLN"]
+        bought_pln = bought_row["Purchase Price"] * bought_row["USD-PLN"]
+        tax = (sold_pln - bought_pln) * 0.19
+        total_tax += tax
+        print(
+            f"Selling 1 {source} share",
+            f"for {sold_pln:.2f} PLN.",
+            f"bought for {bought_pln:.2f} PLN.",
+            f"Remaining {len(bought)} shares.",
+            f"Tax {tax:.2f} PLN.",
+            f"Total tax \033[1;31m{total_tax:.2f} PLN\033[0m.",
+        )
+    return total_tax
+
+
+def _buy_rs(row: pd.Series, bought: List[pd.Series]) -> None:
+    for _ in range(row["Quantity"]):
+        bought.append(row)
+    print(
+        f"Vesting {row['Quantity']} {ShareType.RS.value} shares",
+        f"Remaining {len(bought)} shares.",
+    )
+
+
+def _sell_rs(
+    row: pd.Series, bought: List[pd.Series], total_tax: float
+) -> float:
+    date = row["Date"]
+    exchange_rate = row["USD-PLN"]
+    assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
+    for _ in range(row["Shares"]):
+        bought_row = bought.pop(0)
+        source = getattr(ShareType, bought_row["Description"]).value
+        sold_pln = row["Sale Price"] * row["USD-PLN"]
+        tax = sold_pln * 0.19
+        total_tax += tax
+        print(
+            f"Selling 1 {source} share",
+            f"for {sold_pln:.2f} PLN.",
+            f"Remaining {len(bought)} shares.",
+            f"Tax {tax:.2f} PLN.",
+            f"Total tax \033[1;31m{total_tax:.2f} PLN\033[0m.",
+        )
+    return total_tax
+
+
+def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("path", type=Path)
     args = parser.parse_args()
@@ -103,57 +179,17 @@ def main():
         lambda x: x or np.nan
     )
     df["Award ID"] = df["Award ID"].astype(float)
-    bought = []
+    bought: List[pd.Series] = []
     total_tax = 0.0
     for i, row in df[::-1].iterrows():
         if row["Description"] == "ESPP":
-            assert pd.notnull(
-                row["USD-PLN"]
-            ), f"Provide the exchange rate for {row['Date']}!"
-            for _ in range(row["Quantity"]):
-                bought.append(row)
-            bought_pln = (
-                row["Purchase Price"] * row["USD-PLN"] * row["Quantity"]
-            )
-            print(
-                f"[\033[38;5;208mESPP\033[0m] Buying {row['Quantity']} shares for {bought_pln:.2f} PLN. Remaining {len(bought)} shares."
-            )
+            _buy_espp(row, bought)
         if row["Type"] == "ESPP":
-            assert pd.notnull(
-                row["USD-PLN"]
-            ), f"Provide the exchange rate for {row['Date']}!"
-            for _ in range(row["Shares"]):
-                bought_row = bought.pop(0)
-                sold_pln = row["Sale Price"] * row["USD-PLN"]
-                bought_pln = (
-                    bought_row["Purchase Price"] * bought_row["USD-PLN"]
-                )
-                tax = (sold_pln - bought_pln) * 0.19
-                total_tax += tax
-                print(
-                    f"[\033[38;5;208mESPP\033[0m] Selling 1 share ({bought_row['Description']}) for {sold_pln:.2f} PLN bought for {bought_pln:.2f} PLN. Remaining {len(bought)} shares. Tax {tax:.2f} PLN. Total tax \033[1;31m{total_tax:.2f} PLN\033[0m."
-                )
+            total_tax = _sell_espp(row, bought, total_tax)
         if row["Description"] == "RS":
-            assert pd.notnull(
-                row["USD-PLN"]
-            ), f"Provide the exchange rate for {row['Date']}!"
-            for _ in range(row["Quantity"]):
-                bought.append(row)
-            print(
-                f"[\033[35mRS\033[0m] Vesting {row['Quantity']} shares. Remaining {len(bought)} shares."
-            )
+            _buy_rs(row, bought)
         if row["Type"] == "RS":
-            assert pd.notnull(
-                row["USD-PLN"]
-            ), f"Provide the exchange rate for {row['Date']}!"
-            for _ in range(row["Shares"]):
-                bought_row = bought.pop(0)
-                sold_pln = row["Sale Price"] * row["USD-PLN"]
-                tax = sold_pln * 0.19
-                total_tax += tax
-                print(
-                    f"[\033[35mRS\033[0m] Selling 1 share ({bought_row['Description']}) for {sold_pln:.2f} PLN. Remaining {len(bought)} shares. Tax {tax:.2f} PLN. Total tax \033[1;31m{total_tax:.2f} PLN\033[0m."
-                )
+            total_tax = _sell_rs(row, bought, total_tax)
 
 
 if __name__ == "__main__":
