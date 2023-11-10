@@ -61,7 +61,8 @@ def _sell_espp(
         total_tax += tax if date.year == year else 0.0
         print(
             f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
-            f"{row['Action']} {formatting}1 {bought_row['Description']} share\033[0m",
+            f"{row['Action']} {formatting}1 {bought_row['Description']}",
+            f"share\033[0m",
             f"for {sold_pln:.2f} PLN",
             f"bought for {bought_pln:.2f} PLN.",
             f"Remaining {len(bought)} shares.",
@@ -75,7 +76,8 @@ def _buy_rs(row: pd.Series, bought: List[pd.Series]) -> None:
         bought.append(row)
     print(
         f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} {Format.RS.value}{row['Quantity']} RS shares\033[0m.",
+        f"{row['Action']} {Format.RS.value}{row['Quantity']}",
+        f"RS shares\033[0m.",
         f"Remaining {len(bought)} shares.",
     )
 
@@ -94,7 +96,8 @@ def _sell_rs(
         total_tax += tax if date.year == year else 0.0
         print(
             f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
-            f"{row['Action']} {formatting}1 {bought_row['Description']} share\033[0m",
+            f"{row['Action']} {formatting}1 {bought_row['Description']}",
+            f"share\033[0m",
             f"for {sold_pln:.2f} PLN.",
             f"Remaining \033[1;34m{len(bought)} shares\033[0m.",
             f"Total tax for {year} \033[1;31m{total_tax:.2f} PLN\033[0m.",
@@ -147,8 +150,15 @@ def _remaining_shares(bought: List[pd.Series]):
 
 def main() -> None:
     parser = ArgumentParser()
-    parser.add_argument("path", type=Path)
-    parser.add_argument("--year", required=True, type=int)
+    parser.add_argument(
+        "path", type=Path, help="Path to the charles-schwab csv file."
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        default=datetime.now().year,
+        help="Taxing year (default: %(default)s).",
+    )
     args = parser.parse_args()
     with open(args.path, "r") as stream:
         next(stream)
