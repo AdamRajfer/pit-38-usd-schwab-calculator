@@ -1,0 +1,17 @@
+[tool.black]
+line_length = 79
+
+[tool.isort]
+line_length = 79
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.autoflake]
+remove_all_unused_imports = true
+in_place = true
+remove_unused_variables = true
