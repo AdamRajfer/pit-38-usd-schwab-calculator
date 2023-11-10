@@ -41,7 +41,7 @@ def _buy_espp(row: pd.Series, bought: List[pd.Series]) -> None:
     print(
         f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
         f"{row['Action']} {Format.ESPP.value}{row['Quantity']}",
-        f"ESPP shares\033[0m",
+        "ESPP shares\033[0m",
         f"for {bought_pln:.2f} PLN.",
         f"Remaining {len(bought)} shares.",
     )
@@ -63,7 +63,7 @@ def _sell_espp(
         print(
             f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
             f"{row['Action']} {formatting}1 {bought_row['Description']}",
-            f"share\033[0m",
+            "share\033[0m",
             f"for {sold_pln:.2f} PLN",
             f"bought for {bought_pln:.2f} PLN.",
             f"Remaining {len(bought)} shares.",
@@ -78,7 +78,7 @@ def _buy_rs(row: pd.Series, bought: List[pd.Series]) -> None:
     print(
         f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
         f"{row['Action']} {Format.RS.value}{row['Quantity']}",
-        f"RS shares\033[0m.",
+        "RS shares\033[0m.",
         f"Remaining {len(bought)} shares.",
     )
 
@@ -98,7 +98,7 @@ def _sell_rs(
         print(
             f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
             f"{row['Action']} {formatting}1 {bought_row['Description']}",
-            f"share\033[0m",
+            "share\033[0m",
             f"for {sold_pln:.2f} PLN.",
             f"Remaining \033[1;34m{len(bought)} shares\033[0m.",
             f"Total tax for {year} \033[1;31m{total_tax:.2f} PLN\033[0m.",
