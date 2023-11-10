@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -37,8 +37,13 @@ def _buy_espp(row: pd.Series, bought: List[pd.Series]) -> None:
 
 
 def _sell_espp(
-    row: pd.Series, bought: List[pd.Series], total_tax: float, year: int
-) -> float:
+    row: pd.Series,
+    bought: List[pd.Series],
+    total_gross_income: float,
+    total_cost_of_earning_revenue: float,
+    total_tax: float,
+    year: int,
+) -> Tuple[float, float, float]:
     date = row["Date"]
     exchange_rate = row["USD-PLN"]
     assert pd.notnull(
@@ -49,6 +54,8 @@ def _sell_espp(
         formatting = getattr(Format, bought_row["Description"]).value
         sold_pln = row["Sale Price"] * row["USD-PLN"]
         bought_pln = bought_row["Purchase Price"] * bought_row["USD-PLN"]
+        total_gross_income += sold_pln
+        total_cost_of_earning_revenue += bought_pln
         tax = (sold_pln - bought_pln) * 0.19
         total_tax += tax if date.year == year else 0.0
         print(
@@ -60,7 +67,7 @@ def _sell_espp(
             f"Remaining {len(bought)} shares.",
             f"Total tax for {year} \033[1;31m{total_tax:.2f} PLN\033[0m.",
         )
-    return total_tax
+    return total_gross_income, total_cost_of_earning_revenue, total_tax
 
 
 def _buy_rs(row: pd.Series, bought: List[pd.Series]) -> None:
@@ -75,8 +82,12 @@ def _buy_rs(row: pd.Series, bought: List[pd.Series]) -> None:
 
 
 def _sell_rs(
-    row: pd.Series, bought: List[pd.Series], total_tax: float, year: int
-) -> float:
+    row: pd.Series,
+    bought: List[pd.Series],
+    total_gross_income: float,
+    total_tax: float,
+    year: int,
+) -> Tuple[float, float]:
     date = row["Date"]
     exchange_rate = row["USD-PLN"]
     assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
@@ -84,6 +95,7 @@ def _sell_rs(
         bought_row = bought.pop(0)
         formatting = getattr(Format, bought_row["Description"]).value
         sold_pln = row["Sale Price"] * row["USD-PLN"]
+        total_gross_income += sold_pln
         tax = sold_pln * 0.19
         total_tax += tax if date.year == year else 0.0
         print(
@@ -94,13 +106,13 @@ def _sell_rs(
             f"Remaining \033[1;34m{len(bought)} shares\033[0m.",
             f"Total tax for {year} \033[1;31m{total_tax:.2f} PLN\033[0m.",
         )
-    return total_tax
+    return total_gross_income, total_tax
 
 
 def _transferr_cash(row: pd.Series) -> None:
     print(
         f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} \033[1;32m{-row['Amount']:.2f} USD\033[0m.",
+        f"{row['Action']} \033[0;32m{-row['Amount']:.2f} USD\033[0m.",
         f"Included fees and commissions {-row['Fees & Commissions']:.2f} USD.",
     )
 
@@ -115,7 +127,7 @@ def _debit(row: pd.Series) -> None:
 def _credit(row: pd.Series) -> None:
     print(
         f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} \033[1;32m{row['Amount']:.2f} USD\033[0m.",
+        f"{row['Action']} \033[0;32m{row['Amount']:.2f} USD\033[0m.",
     )
 
 
@@ -126,17 +138,42 @@ def _rs_lapse(row: pd.Series) -> None:
     )
 
 
+def _remaining_shares(bought: List[pd.Series]):
+    print(
+        f"[\033[1;37m{datetime.now().year}\033[0m]",
+        f"Remaining {len(bought)} shares.",
+    )
+
+
+def _total_gross_income(total_gross_income: float, year: int):
+    print(
+        f"[\033[1;37m{year}\033[0m]",
+        f"Total gross income {total_gross_income:.2f} PLN.",
+    )
+
+
+def _total_cost_of_earning_revenue(
+    total_cost_of_earning_revenue: float, year: int
+):
+    print(
+        f"[\033[1;37m{year}\033[0m]",
+        f"Total cost of earning revenue {total_cost_of_earning_revenue:.2f} PLN.",
+    )
+
+
+def _total_net_income(
+    total_gross_income: float, total_cost_of_earning_revenue: float, year: int
+):
+    print(
+        f"[\033[1;37m{year}\033[0m]",
+        f"Total net income {total_gross_income - total_cost_of_earning_revenue:.2f} PLN.",
+    )
+
+
 def _total_tax(total_tax: float, year: int):
     print(
         f"[\033[1;37m{year}\033[0m]",
         f"Total tax \033[1;31m{total_tax:.2f} PLN\033[0m.",
-    )
-
-
-def _remaining_shares(bought: List[pd.Series]):
-    print(
-        f"[\033[1;37m{datetime.now().year}\033[0m]",
-        f"Remaining \033[1;34m{len(bought)} shares\033[0m.",
     )
 
 
@@ -153,7 +190,7 @@ def charles_schwab() -> None:
     parser.add_argument(
         "--year",
         type=int,
-        default=datetime.now().year,
+        default=datetime.now().year - 1,
         help="Taxing year (default: %(default)s).",
     )
     args = parser.parse_args(rest)
@@ -234,16 +271,31 @@ def charles_schwab() -> None:
     )
     df["Award ID"] = df["Award ID"].astype(float)
     bought: List[pd.Series] = []
+    total_gross_income = 0.0
+    total_cost_of_earning_revenue = 0.0
     total_tax = 0.0
     for _, row in df[::-1].iterrows():
         if row["Description"] == "ESPP":
             _buy_espp(row, bought)
         elif row["Type"] == "ESPP":
-            total_tax = _sell_espp(row, bought, total_tax, args.year)
+            (
+                total_gross_income,
+                total_cost_of_earning_revenue,
+                total_tax,
+            ) = _sell_espp(
+                row,
+                bought,
+                total_gross_income,
+                total_cost_of_earning_revenue,
+                total_tax,
+                args.year,
+            )
         elif row["Description"] == "RS":
             _buy_rs(row, bought)
         elif row["Type"] == "RS":
-            total_tax = _sell_rs(row, bought, total_tax, args.year)
+            total_gross_income, total_tax = _sell_rs(
+                row, bought, total_gross_income, total_tax, args.year
+            )
         elif row["Description"] == "Cash Disbursement":
             _transferr_cash(row)
         elif row["Description"] == "Debit":
@@ -254,8 +306,14 @@ def charles_schwab() -> None:
             _rs_lapse(row)
         else:
             raise ValueError(f"Unknown description: {row['Description']}!")
-    _total_tax(total_tax, args.year)
+    print(f"---\nSUMMARY\n---")
     _remaining_shares(bought)
+    _total_gross_income(total_gross_income, args.year)
+    _total_cost_of_earning_revenue(total_cost_of_earning_revenue, args.year)
+    _total_net_income(
+        total_gross_income, total_cost_of_earning_revenue, args.year
+    )
+    _total_tax(total_tax, args.year)
 
 
 if __name__ == "__main__":
