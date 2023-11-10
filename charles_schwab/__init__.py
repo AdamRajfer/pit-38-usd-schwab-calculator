@@ -46,16 +46,19 @@ def _sell_espp(
 ) -> Tuple[float, float, float]:
     date = row["Date"]
     exchange_rate = row["USD-PLN"]
-    assert pd.notnull(
-        exchange_rate
-    ), f"Provide the exchange rate for {date.strftime('%Y-%m-%d')} in {CONFIG_PATH}!"
+    assert pd.notnull(exchange_rate), (
+        f"Provide the exchange rate for "
+        f"{date.strftime('%Y-%m-%d')} in {CONFIG_PATH}!"
+    )
     for _ in range(row["Shares"]):
         bought_row = bought.pop(0)
         formatting = getattr(Format, bought_row["Description"]).value
         sold_pln = row["Sale Price"] * row["USD-PLN"]
         bought_pln = bought_row["Purchase Price"] * bought_row["USD-PLN"]
-        total_gross_income += sold_pln
-        total_cost_of_earning_revenue += bought_pln
+        total_gross_income += sold_pln if date.year == year else 0.0
+        total_cost_of_earning_revenue += (
+            bought_pln if date.year == year else 0.0
+        )
         tax = (sold_pln - bought_pln) * 0.19
         total_tax += tax if date.year == year else 0.0
         print(
@@ -95,7 +98,7 @@ def _sell_rs(
         bought_row = bought.pop(0)
         formatting = getattr(Format, bought_row["Description"]).value
         sold_pln = row["Sale Price"] * row["USD-PLN"]
-        total_gross_income += sold_pln
+        total_gross_income += sold_pln if date.year == year else 0.0
         tax = sold_pln * 0.19
         total_tax += tax if date.year == year else 0.0
         print(
@@ -157,7 +160,8 @@ def _total_cost_of_earning_revenue(
 ):
     print(
         f"[\033[1;37m{year}\033[0m]",
-        f"Total cost of earning revenue {total_cost_of_earning_revenue:.2f} PLN.",
+        "Total cost of earning revenue",
+        f"{total_cost_of_earning_revenue:.2f} PLN.",
     )
 
 
@@ -166,7 +170,8 @@ def _total_net_income(
 ):
     print(
         f"[\033[1;37m{year}\033[0m]",
-        f"Total net income {total_gross_income - total_cost_of_earning_revenue:.2f} PLN.",
+        "Total net income",
+        f"{total_gross_income - total_cost_of_earning_revenue:.2f} PLN.",
     )
 
 
