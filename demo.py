@@ -181,7 +181,7 @@ def main() -> None:
     df["Award ID"] = df["Award ID"].astype(float)
     bought: List[pd.Series] = []
     total_tax = 0.0
-    for i, row in df[::-1].iterrows():
+    for _, row in df[::-1].iterrows():
         if row["Description"] == "ESPP":
             _buy_espp(row, bought)
         if row["Type"] == "ESPP":
