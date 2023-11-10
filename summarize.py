@@ -40,7 +40,8 @@ def _buy_espp(row: pd.Series, bought: List[pd.Series]) -> None:
     bought_pln = row["Purchase Price"] * row["USD-PLN"] * row["Quantity"]
     print(
         f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} {Format.ESPP.value}{row['Quantity']} ESPP shares\033[0m",
+        f"{row['Action']} {Format.ESPP.value}{row['Quantity']}",
+        f"ESPP shares\033[0m",
         f"for {bought_pln:.2f} PLN.",
         f"Remaining {len(bought)} shares.",
     )
