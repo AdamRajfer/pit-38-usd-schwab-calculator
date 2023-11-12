@@ -1,18 +1,12 @@
-import os
 from argparse import ArgumentParser
 from collections import defaultdict
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-import yaml
-
-CONFIG_PATH = Path(os.path.dirname(__file__)) / "config.yaml"
-with open(CONFIG_PATH, "r") as stream:
-    CONFIG = yaml.safe_load(stream)
 
 
 class Format(Enum):
@@ -20,13 +14,21 @@ class Format(Enum):
     RS = "\033[35m"
 
 
+def _try_to_float(x: Any) -> Optional[float]:
+    try:
+        assert "," in x
+        return float(x.replace(",", "."))
+    except (AttributeError, ValueError, AssertionError, TypeError):
+        return None
+
+
 def _buy_espp(row: pd.Series, bought: List[pd.Series]) -> None:
     date = row["Date"]
-    exchange_rate = row["USD-PLN"]
-    assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
+    exchange_rate = row["1USD"]
+    assert pd.notnull(exchange_rate)
     for _ in range(row["Quantity"]):
         bought.append(row)
-    bought_pln = row["Purchase Price"] * row["USD-PLN"] * row["Quantity"]
+    bought_pln = row["Purchase Price"] * row["1USD"] * row["Quantity"]
     print(
         f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
         f"{row['Action']} {Format.ESPP.value}{row['Quantity']}",
@@ -45,16 +47,13 @@ def _sell_espp(
     year: int,
 ) -> Tuple[float, float, float]:
     date = row["Date"]
-    exchange_rate = row["USD-PLN"]
-    assert pd.notnull(exchange_rate), (
-        f"Provide the exchange rate for "
-        f"{date.strftime('%Y-%m-%d')} in {CONFIG_PATH}!"
-    )
+    exchange_rate = row["1USD"]
+    assert pd.notnull(exchange_rate)
     for _ in range(row["Shares"]):
         bought_row = bought.pop(0)
         formatting = getattr(Format, bought_row["Description"]).value
-        sold_pln = row["Sale Price"] * row["USD-PLN"]
-        bought_pln = bought_row["Purchase Price"] * bought_row["USD-PLN"]
+        sold_pln = row["Sale Price"] * row["1USD"]
+        bought_pln = bought_row["Purchase Price"] * bought_row["1USD"]
         total_gross_income += sold_pln if date.year == year else 0.0
         total_cost_of_earning_revenue += (
             bought_pln if date.year == year else 0.0
@@ -92,12 +91,12 @@ def _sell_rs(
     year: int,
 ) -> Tuple[float, float]:
     date = row["Date"]
-    exchange_rate = row["USD-PLN"]
-    assert pd.notnull(exchange_rate), f"Provide the exchange rate for {date}!"
+    exchange_rate = row["1USD"]
+    assert pd.notnull(exchange_rate)
     for _ in range(row["Shares"]):
         bought_row = bought.pop(0)
         formatting = getattr(Format, bought_row["Description"]).value
-        sold_pln = row["Sale Price"] * row["USD-PLN"]
+        sold_pln = row["Sale Price"] * row["1USD"]
         total_gross_income += sold_pln if date.year == year else 0.0
         tax = sold_pln * 0.19
         total_tax += tax if date.year == year else 0.0
@@ -268,9 +267,32 @@ def charles_schwab() -> None:
         .applymap(lambda x: x or "NaN")
         .astype(float)
     )
-    df["USD-PLN"] = df["Date"].apply(
-        lambda x: CONFIG["exchange_rates"].get(x.strftime("%Y-%m-%d"), None)
+    exchange_rates_list = []
+    for year in df["Date"].apply(lambda x: x.year).unique():
+        exchange_rates = (
+            pd.read_csv(
+                f"https://static.nbp.pl/dane/kursy/Archiwum/archiwum_tab_a_{year}.csv",
+                delimiter=";",
+                encoding="iso-8859-2",
+                header=0,
+                skiprows=[1],
+            )
+            .set_index("data")
+            .applymap(_try_to_float)
+            .dropna(axis=1, how="all")
+            .dropna(axis=0, how="all")
+            .astype(float)
+            .rename_axis(index="Date")
+            .reset_index()
+        )
+        exchange_rates["Date"] = pd.to_datetime(exchange_rates["Date"])
+        exchange_rates_list.append(exchange_rates)
+    exchange_rates_df = pd.concat(exchange_rates_list).sort_values(
+        by="Date", ignore_index=True
     )
+    exchange_rates_shifted_df = exchange_rates_df.shift()
+    exchange_rates_shifted_df["Date"] = exchange_rates_df["Date"]
+    df = df.merge(exchange_rates_shifted_df)
     df[df.select_dtypes(object).columns] = df.select_dtypes(object).applymap(
         lambda x: x or np.nan
     )
