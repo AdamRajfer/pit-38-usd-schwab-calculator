@@ -234,16 +234,14 @@ def charles_schwab() -> None:
     df_additional = pd.concat(data.values())
     df = df_actions.join(df_additional)
     dolar_cols = (
-        df.applymap(
-            lambda x: ("$" in x if isinstance(x, str) else False) or None
-        )
+        df.map(lambda x: ("$" in x if isinstance(x, str) else False) or None)
         .mean()
         .dropna()
         .index.tolist()
     )
     df[dolar_cols] = (
         df[dolar_cols]
-        .applymap(
+        .map(
             lambda x: x.replace("$", "").replace(",", "") or None
             if isinstance(x, str)
             else x
@@ -264,7 +262,7 @@ def charles_schwab() -> None:
     df = df.rename(columns={None: "None Column", "": "Empty Column"})
     df[["Empty Column", "None Column", "Grant Id"]] = (
         df[["Empty Column", "None Column", "Grant Id"]]
-        .applymap(lambda x: x or "NaN")
+        .map(lambda x: x or "NaN")
         .astype(float)
     )
     exchange_rates_list = []
@@ -278,7 +276,7 @@ def charles_schwab() -> None:
                 skiprows=[1],
             )
             .set_index("data")
-            .applymap(_try_to_float)
+            .map(_try_to_float)
             .dropna(axis=1, how="all")
             .dropna(axis=0, how="all")
             .astype(float)
@@ -293,7 +291,7 @@ def charles_schwab() -> None:
     exchange_rates_shifted_df = exchange_rates_df.shift()
     exchange_rates_shifted_df["Date"] = exchange_rates_df["Date"]
     df = df.merge(exchange_rates_shifted_df)
-    df[df.select_dtypes(object).columns] = df.select_dtypes(object).applymap(
+    df[df.select_dtypes(object).columns] = df.select_dtypes(object).map(
         lambda x: x or np.nan
     )
     df["Award ID"] = df["Award ID"].astype(float)
