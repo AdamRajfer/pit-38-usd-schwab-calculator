@@ -181,7 +181,7 @@ def _total_tax(total_tax: float, year: int):
     )
 
 
-def charles_schwab() -> None:
+def pit_38_usd_schwab_calculator() -> None:
     parser = ArgumentParser(add_help=False)
     parser.add_argument("cmd", choices=["summarize"])
     args, rest = parser.parse_known_args()
@@ -189,7 +189,7 @@ def charles_schwab() -> None:
         raise ValueError(f"Invalid cmd: {args.cmd}!")
     parser = ArgumentParser()
     parser.add_argument(
-        "path", type=Path, help="Path to the charles-schwab csv file."
+        "path", type=Path, help="Path to the charles schwab csv file."
     )
     parser.add_argument(
         "--year",
@@ -342,4 +342,4 @@ def charles_schwab() -> None:
 
 
 if __name__ == "__main__":
-    charles_schwab()
+    pit_38_usd_schwab_calculator()
