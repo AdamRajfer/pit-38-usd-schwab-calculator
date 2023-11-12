@@ -1,9 +1,11 @@
-# charles-schwab
+# pit-38-usd-schwab-calculator
+
+Tool for summarizing taxes for PIT-38 given a Charles Schwab CSV file with full history of USD transactions.
 
 ## Installation
 
 ```bash
-pip install git+https://github.com/AdamRajfer/charles-schwab
+pip install git+https://github.com/AdamRajfer/pit-38-usd-schwab-calculator
 ```
 
 ## Summarization of taxes
@@ -15,7 +17,7 @@ pip install git+https://github.com/AdamRajfer/charles-schwab
 4. After downloading the file, run the following command in order to get the tax summarization:
 
 ```bash
-charles_schwab summarize <path_to_the_exported_csv_file>
+pit_38_usd_schwab_calculator <path_to_the_exported_csv_file>
 ```
 
 By default, it will generate the report for the preceeding year. If you want to specify the exact year, use `--year` flag (eg. `--year 2022`).
