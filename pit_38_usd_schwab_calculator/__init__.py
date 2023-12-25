@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-EXCHANGE_RATES = None
+EXCHANGE_RATES = pd.DataFrame()
+
 
 class Format(Enum):
     ESPP = "\033[38;5;208m"
@@ -138,7 +139,7 @@ def _credit(row: pd.Series) -> None:
 
 
 def _rs_lapse(row: pd.Series) -> None:
-    quantity = int(row['Quantity'])
+    quantity = int(row["Quantity"])
     print(
         f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
         f"{row['Action']} {quantity} {row['Description']}.",
@@ -152,12 +153,16 @@ def _remaining_shares(bought: List[pd.Series]):
     stocks = {}
     for stock in bought:
         if stock["Symbol"] not in stocks:
-            stocks[stock["Symbol"]] = yf.Ticker(stock["Symbol"]).history(period="1d")["Close"].iloc[0]
+            stocks[stock["Symbol"]] = (
+                yf.Ticker(stock["Symbol"])
+                .history(period="1d")["Close"]
+                .iloc[0]
+            )
         total_usd += stocks[stock["Symbol"]]
     print(
         f"[\033[1;37m{year}\033[0m]",
         f"Remaining {len(bought)} shares with total value of",
-        f"\033[0;32m{total_usd * exchange_rate:.2f} PLN\033[0m."
+        f"\033[0;32m{total_usd * exchange_rate:.2f} PLN\033[0m.",
     )
 
 
@@ -218,11 +223,24 @@ def pit_38_usd_schwab_calculator() -> None:
             data[curr].append(row)
         else:
             if curr in data:
-                data[curr] = pd.DataFrame(data[curr]).dropna(axis=1, how="all").assign(action_id=curr)
+                data[curr] = (
+                    pd.DataFrame(data[curr])
+                    .dropna(axis=1, how="all")
+                    .assign(action_id=curr)
+                )
             curr = i
     if curr in data:
-        data[curr] = pd.DataFrame(data[curr]).dropna(axis=1, how="all").assign(action_id=curr)
-    df_additional = pd.concat(data.values()).dropna(axis=1, how="all").set_index("action_id").rename_axis(index=None)
+        data[curr] = (
+            pd.DataFrame(data[curr])
+            .dropna(axis=1, how="all")
+            .assign(action_id=curr)
+        )
+    df_additional = (
+        pd.concat(data.values())
+        .dropna(axis=1, how="all")
+        .set_index("action_id")
+        .rename_axis(index=None)
+    )
     df = df_actions.join(df_additional)
     for col in df.columns:
         if "Date" in col:
@@ -243,7 +261,10 @@ def pit_38_usd_schwab_calculator() -> None:
         .astype(float)
     )
     exchange_rates_list = []
-    for year in {*df.select_dtypes(np.datetime64).stack().apply(lambda x: x.year), datetime.now().year}:
+    for year in {
+        *df.select_dtypes(np.datetime64).stack().apply(lambda x: x.year),
+        datetime.now().year,
+    }:
         exchange_rates = (
             pd.read_csv(
                 f"https://static.nbp.pl/dane/kursy/Archiwum/archiwum_tab_a_{year}.csv",
