@@ -9,5 +9,5 @@ setup(
             "pit_38_usd_schwab_calculator=pit_38_usd_schwab_calculator:pit_38_usd_schwab_calculator"
         ]
     },
-    install_requires=["numpy", "pandas"],
+    install_requires=["numpy", "pandas", "yfinance"],
 )
