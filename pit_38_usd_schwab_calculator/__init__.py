@@ -2,7 +2,6 @@ from argparse import ArgumentParser
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -11,6 +10,19 @@ import pandas as pd
 import yfinance as yf
 
 EXCHANGE_RATES = pd.DataFrame()
+
+
+def _try_to_float(x: Any) -> Optional[float]:
+    try:
+        assert "," in x
+        return float(x.replace(",", "."))
+    except (AttributeError, ValueError, AssertionError, TypeError):
+        return None
+
+
+class Format:
+    ESPP = "\033[38;5;208m"
+    RS = "\033[35m"
 
 
 @dataclass
@@ -36,16 +48,18 @@ class Finance:
 class State:
     employment_date: np.datetime64
     net_salary_per_month: float
-    bought: List[pd.Series] = field(default_factory=list)
-    finances: Dict[int, Finance] = field(
-        default_factory=lambda: defaultdict(Finance)
-    )
+    bought: List[pd.Series] = field(init=False)
+    finances: Dict[int, Finance] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.bought = []
+        self.finances = defaultdict(Finance)
 
     def __str__(self) -> str:
-        return self.pit_38.to_string()
+        return self.to_frame.to_string()
 
     @property
-    def pit_38(self) -> pd.DataFrame:
+    def to_frame(self) -> pd.DataFrame:
         df = pd.DataFrame(
             {
                 k: {k1.replace("_", "-"): v1 for k1, v1 in v.__dict__.items()}
@@ -66,11 +80,6 @@ class State:
         return df.join(total.T, how="right")
 
     @property
-    def summary(self) -> pd.DataFrame:
-        pit_38 = self.pit_38["total"]
-        return pd.concat([pit_38, pd.Series({"remaining": self.remaining})])
-
-    @property
     def remaining(self) -> float:
         exchange_rate = EXCHANGE_RATES.iloc[-1]["1USD"]
         remaining_usd = 0.0
@@ -85,115 +94,118 @@ class State:
             remaining_usd += stocks[stock["Symbol"]]
         return remaining_usd * exchange_rate
 
+    def resolve(self, df: pd.DataFrame) -> "State":
+        for _, row in df.iterrows():
+            if row["Description"] == "ESPP":
+                self._buy_espp(row)
+            elif row["Type"] == "ESPP":
+                self._sell_espp(row)
+            elif row["Description"] == "RS":
+                self._buy_rs(row)
+            elif row["Type"] == "RS":
+                self._sell_rs(row)
+            elif row["Description"] == "Cash Disbursement":
+                self._transferr_cash(row)
+            elif row["Description"] == "Debit":
+                self._debit(row)
+            elif row["Description"] == "Credit":
+                self._credit(row)
+            elif row["Description"] == "Restricted Stock Lapse":
+                self._rs_lapse(row)
+            else:
+                raise ValueError(f"Unknown description: {row['Description']}!")
+        return self
 
-class Format(Enum):
-    ESPP = "\033[38;5;208m"
-    RS = "\033[35m"
-
-
-def _try_to_float(x: Any) -> Optional[float]:
-    try:
-        assert "," in x
-        return float(x.replace(",", "."))
-    except (AttributeError, ValueError, AssertionError, TypeError):
-        return None
-
-
-def _buy_espp(row: pd.Series, state: State) -> None:
-    date = row["Date"]
-    exchange_rate = EXCHANGE_RATES.loc[row["Date"], "1USD"]
-    quantity = int(row["Quantity"])
-    for _ in range(quantity):
-        state.bought.append(row)
-    bought_pln = row["PurchasePrice"] * exchange_rate * quantity
-    print(
-        f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} {Format.ESPP.value}{quantity}",
-        "ESPP remaining\033[0m",
-        f"for {bought_pln:.2f} PLN.",
-        f"Remaining {len(state.bought)} shares.",
-    )
-
-
-def _sell_espp(row: pd.Series, state: State) -> None:
-    date = row["Date"]
-    exchange_rate = EXCHANGE_RATES.loc[row["Date"], "1USD"]
-    remaining = int(row["Shares"])
-    for _ in range(remaining):
-        bought_row = state.bought.pop(0)
-        formatting = getattr(Format, bought_row["Description"]).value
-        pln = row["SalePrice"] * exchange_rate
-        exchange_rate_bought = EXCHANGE_RATES.loc[bought_row["Date"], "1USD"]
-        bought_pln = bought_row["PurchasePrice"] * exchange_rate_bought
-        state.finances[date.year] += Finance(gross=pln, cost=bought_pln)
+    def _buy_espp(self, row: pd.Series) -> None:
+        date = row["Date"]
+        exchange_rate = EXCHANGE_RATES.loc[row["Date"], "1USD"]
+        quantity = int(row["Quantity"])
+        for _ in range(quantity):
+            self.bought.append(row)
+        bought_pln = row["PurchasePrice"] * exchange_rate * quantity
         print(
             f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
-            f"{row['Action']} {formatting}1 {bought_row['Description']}",
-            "share\033[0m",
-            f"for {pln:.2f} PLN",
-            f"bought for {bought_pln:.2f} PLN.",
-            f"Remaining {len(state.bought)} shares.",
+            f"{row['Action']} {Format.ESPP}{quantity}",
+            "ESPP remaining\033[0m",
+            f"for {bought_pln:.2f} PLN.",
+            f"Remaining {len(self.bought)} shares.",
         )
 
+    def _sell_espp(self, row: pd.Series) -> None:
+        date = row["Date"]
+        exchange_rate = EXCHANGE_RATES.loc[row["Date"], "1USD"]
+        remaining = int(row["Shares"])
+        for _ in range(remaining):
+            bought_row = self.bought.pop(0)
+            formatting = getattr(Format, bought_row["Description"])
+            pln = row["SalePrice"] * exchange_rate
+            exchange_rate_bought = EXCHANGE_RATES.loc[
+                bought_row["Date"], "1USD"
+            ]
+            bought_pln = bought_row["PurchasePrice"] * exchange_rate_bought
+            self.finances[date.year] += Finance(gross=pln, cost=bought_pln)
+            print(
+                f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
+                f"{row['Action']} {formatting}1 {bought_row['Description']}",
+                "share\033[0m",
+                f"for {pln:.2f} PLN",
+                f"bought for {bought_pln:.2f} PLN.",
+                f"Remaining {len(self.bought)} shares.",
+            )
 
-def _buy_rs(row: pd.Series, state: State) -> None:
-    quantity = int(row["Quantity"])
-    for _ in range(quantity):
-        state.bought.append(row)
-    print(
-        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} {Format.RS.value}{quantity}",
-        "RS remaining\033[0m.",
-        f"Remaining {len(state.bought)} shares.",
-    )
-
-
-def _sell_rs(row: pd.Series, state: State) -> None:
-    date = row["Date"]
-    exchange_rate = EXCHANGE_RATES.loc[row["Date"], "1USD"]
-    remaining = int(row["Shares"])
-    for _ in range(remaining):
-        bought_row = state.bought.pop(0)
-        formatting = getattr(Format, bought_row["Description"]).value
-        pln = row["SalePrice"] * exchange_rate
-        state.finances[date.year] += Finance(gross=pln)
+    def _buy_rs(self, row: pd.Series) -> None:
+        quantity = int(row["Quantity"])
+        for _ in range(quantity):
+            self.bought.append(row)
         print(
-            f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
-            f"{row['Action']} {formatting}1 {bought_row['Description']}",
-            "share\033[0m",
-            f"for {pln:.2f} PLN.",
-            f"Remaining \033[1;34m{len(state.bought)} shares\033[0m.",
+            f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+            f"{row['Action']} {Format.RS}{quantity}",
+            "RS remaining\033[0m.",
+            f"Remaining {len(self.bought)} shares.",
         )
 
+    def _sell_rs(self, row: pd.Series) -> None:
+        date = row["Date"]
+        exchange_rate = EXCHANGE_RATES.loc[row["Date"], "1USD"]
+        remaining = int(row["Shares"])
+        for _ in range(remaining):
+            bought_row = self.bought.pop(0)
+            formatting = getattr(Format, bought_row["Description"])
+            pln = row["SalePrice"] * exchange_rate
+            self.finances[date.year] += Finance(gross=pln)
+            print(
+                f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
+                f"{row['Action']} {formatting}1 {bought_row['Description']}",
+                "share\033[0m",
+                f"for {pln:.2f} PLN.",
+                f"Remaining \033[1;34m{len(self.bought)} shares\033[0m.",
+            )
 
-def _transferr_cash(row: pd.Series) -> None:
-    print(
-        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} \033[0;32m{-row['Amount']:.2f} USD\033[0m.",
-        f"Included fees and commissions {-row['FeesAndCommissions']:.2f} USD.",
-    )
+    def _transferr_cash(self, row: pd.Series) -> None:
+        print(
+            f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+            f"{row['Action']} \033[0;32m{-row['Amount']:.2f} USD\033[0m.",
+            f"Included fees and commissions {-row['FeesAndCommissions']:.2f} USD.",
+        )
 
+    def _debit(self, row: pd.Series) -> None:
+        print(
+            f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+            f"{row['Action']} \033[1;31m{-row['Amount']:.2f} USD\033[0m.",
+        )
 
-def _debit(row: pd.Series) -> None:
-    print(
-        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} \033[1;31m{-row['Amount']:.2f} USD\033[0m.",
-    )
+    def _credit(self, row: pd.Series) -> None:
+        print(
+            f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+            f"{row['Action']} \033[0;32m{row['Amount']:.2f} USD\033[0m.",
+        )
 
-
-def _credit(row: pd.Series) -> None:
-    print(
-        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} \033[0;32m{row['Amount']:.2f} USD\033[0m.",
-    )
-
-
-def _rs_lapse(row: pd.Series) -> None:
-    quantity = int(row["Quantity"])
-    print(
-        f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
-        f"{row['Action']} {quantity} {row['Description']}.",
-    )
+    def _rs_lapse(self, row: pd.Series) -> None:
+        quantity = int(row["Quantity"])
+        print(
+            f"[\033[1;37m{row['Date'].strftime('%Y-%m-%d')}\033[0m]",
+            f"{row['Action']} {quantity} {row['Description']}.",
+        )
 
 
 def pit_38_usd_schwab_calculator() -> None:
@@ -294,26 +306,7 @@ def pit_38_usd_schwab_calculator() -> None:
     state = State(
         employment_date=args.employment_date,
         net_salary_per_month=args.net_salary_per_month,
-    )
-    for _, row in df[::-1].iterrows():
-        if row["Description"] == "ESPP":
-            _buy_espp(row, state)
-        elif row["Type"] == "ESPP":
-            _sell_espp(row, state)
-        elif row["Description"] == "RS":
-            _buy_rs(row, state)
-        elif row["Type"] == "RS":
-            _sell_rs(row, state)
-        elif row["Description"] == "Cash Disbursement":
-            _transferr_cash(row)
-        elif row["Description"] == "Debit":
-            _debit(row)
-        elif row["Description"] == "Credit":
-            _credit(row)
-        elif row["Description"] == "Restricted Stock Lapse":
-            _rs_lapse(row)
-        else:
-            raise ValueError(f"Unknown description: {row['Description']}!")
+    ).resolve(df[::-1])
     print(state)
 
 
