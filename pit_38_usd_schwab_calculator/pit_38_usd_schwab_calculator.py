@@ -52,44 +52,16 @@ class Pit38USDSchwabCalculator:
             IncomeSummary
         )
         for schwab_action in self.schwab_actions:
-            if schwab_action.Description == "ESPP":
-                for _ in range(int(schwab_action.Quantity)):
-                    self.schwab_buy_actions.append(schwab_action)
-                msg = f"{self.config.format_config.espp}{int(schwab_action.Quantity)} ESPP shares\033[0m for {schwab_action.PurchasePrice * self.exchange_rates[schwab_action.Date]._1USD * int(schwab_action.Quantity):.2f} PLN."
-            elif schwab_action.Type == "ESPP":
-                msg = ""
-                for _ in range(int(schwab_action.Shares)):
-                    sold_share = self.schwab_buy_actions.pop(0)
-                    annual_income_summary[
-                        schwab_action.Date.year
-                    ] += IncomeSummary(
-                        schwab_action.SalePrice
-                        * self.exchange_rates[schwab_action.Date]._1USD
-                        - sold_share.PurchasePrice
-                        * self.exchange_rates[sold_share.Date]._1USD
-                    )
-                    msg += f"\n  -> {getattr(self.config.format_config, sold_share.Description.lower())}1 {sold_share.Description} share\033[0m for {schwab_action.SalePrice * self.exchange_rates[schwab_action.Date]._1USD:.2f} PLN bought for {sold_share.PurchasePrice * self.exchange_rates[sold_share.Date]._1USD:.2f} PLN."
-            elif schwab_action.Description == "RS":
-                for _ in range(int(schwab_action.Quantity)):
-                    self.schwab_buy_actions.append(schwab_action)
-                msg = f"{self.config.format_config.rs}{int(schwab_action.Quantity)} RS shares\033[0m."
-            elif schwab_action.Type == "RS":
-                msg = ""
-                for _ in range(int(schwab_action.Shares)):
-                    sold_share = self.schwab_buy_actions.pop(0)
-                    annual_income_summary[
-                        schwab_action.Date.year
-                    ] += IncomeSummary(
-                        schwab_action.SalePrice
-                        * self.exchange_rates[schwab_action.Date]._1USD
-                    )
-                    msg += f"\n  -> {getattr(self.config.format_config, sold_share.Description.lower())}1 {sold_share.Description} share\033[0m for {schwab_action.SalePrice * self.exchange_rates[schwab_action.Date]._1USD:.2f} PLN."
-            elif schwab_action.Description == "Cash Disbursement":
-                msg = f"\033[0;32m{-schwab_action.Amount:.2f} USD\033[0m. Included fees and commissions \033[1;31m{-schwab_action.FeesAndCommissions:.2f} USD\033[0m."
-            elif schwab_action.Description == "Debit":
-                msg = f"\033[1;31m{-schwab_action.Amount:.2f} USD\033[0m."
-            elif schwab_action.Description == "Credit":
-                msg = f"\033[0;32m{schwab_action.Amount:.2f} USD\033[0m."
+            if schwab_action.Description in ["ESPP", "RS"]:
+                msg = self._buy(schwab_action)
+            elif schwab_action.Description == "Share Sale":
+                msg = self._sell(schwab_action, annual_income_summary)
+            elif schwab_action.Description in [
+                "Cash Disbursement",
+                "Debit",
+                "Credit",
+            ]:
+                msg = f"{schwab_action.Amount:.2f} USD."
             elif schwab_action.Description == "Restricted Stock Lapse":
                 msg = f"{self.config.format_config.rs}{int(schwab_action.Quantity)} {schwab_action.Description}\033[0m."
             else:
@@ -209,3 +181,35 @@ class Pit38USDSchwabCalculator:
                 * self.exchange_rates[share.Date]._1USD
             )
         return remaining
+
+    def _buy(self, schwab_action: SchwabAction) -> str:
+        purchase_price = (
+            0.0
+            if pd.isnull(schwab_action.PurchasePrice)
+            else schwab_action.PurchasePrice
+        )
+        for _ in range(int(schwab_action.Quantity)):
+            self.schwab_buy_actions.append(schwab_action)
+        return f"{getattr(self.config.format_config, schwab_action.Description.lower())}{int(schwab_action.Quantity)} ESPP shares\033[0m for {purchase_price * self.exchange_rates[schwab_action.Date]._1USD * int(schwab_action.Quantity):.2f} PLN."
+
+    def _sell(
+        self,
+        schwab_action: SchwabAction,
+        annual_income_summary: Dict[int, IncomeSummary],
+    ) -> str:
+        msg = ""
+        for _ in range(int(schwab_action.Shares)):
+            schwab_buy_action = self.schwab_buy_actions.pop(0)
+            purchase_price = (
+                0.0
+                if pd.isnull(schwab_buy_action.PurchasePrice)
+                else schwab_buy_action.PurchasePrice
+            )
+            annual_income_summary[schwab_action.Date.year] += IncomeSummary(
+                schwab_action.SalePrice
+                * self.exchange_rates[schwab_action.Date]._1USD
+                - purchase_price
+                * self.exchange_rates[schwab_buy_action.Date]._1USD
+            )
+            msg += f"\n  -> {getattr(self.config.format_config, schwab_buy_action.Description.lower())}1 {schwab_buy_action.Description} share\033[0m for {schwab_action.SalePrice * self.exchange_rates[schwab_action.Date]._1USD:.2f} PLN bought for {purchase_price * self.exchange_rates[schwab_buy_action.Date]._1USD:.2f} PLN."
+        return msg
