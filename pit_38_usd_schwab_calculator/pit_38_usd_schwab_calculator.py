@@ -27,7 +27,7 @@ class Pit38USDSchwabCalculator:
         total = df.sum(axis=1).to_frame("total").T
         months = (
             datetime.now() - pd.to_datetime(self.config.employment_date)
-        ).days / 30
+        ).days / 30.4375
         total["remaining_gross"] = self.remaining
         total["remaining_tax"] = total["remaining_gross"] * 0.19
         total["remaining_net"] = (
