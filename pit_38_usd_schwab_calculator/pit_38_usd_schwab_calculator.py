@@ -28,20 +28,19 @@ class Pit38USDSchwabCalculator:
         months = (
             datetime.now() - pd.to_datetime(self.config.employment_date)
         ).days / 30
-        total["gross / month"] = total["gross"] / months
-        total["gross + remaining_gross / month"] = (
-            total["gross / month"] + self.remaining / months
+        total["remaining_gross"] = self.remaining
+        total["remaining_tax"] = total["remaining_gross"] * 0.19
+        total["remaining_net"] = (
+            total["remaining_gross"] - total["remaining_tax"]
         )
-        total["gross + remaining_gross + salary_gross / month"] = (
-            total["gross + remaining_gross / month"]
+        total["(gross + remaining_gross + salary_gross) / month"] = (
+            total["gross"] / months
+            + total["remaining_gross"] / months
             + self.config.salary_gross_per_month
         )
-        total["net / month"] = total["net"] / months
-        total["net + remaining_net / month"] = (
-            total["net / month"] + self.remaining * 0.81 / months
-        )
-        total["net + remaining_net + salary_net / month"] = (
-            total["net + remaining_net / month"]
+        total["(net + remaining_net + salary_net) / month"] = (
+            total["net"] / months
+            + total["remaining_net"] / months
             + self.config.salary_net_per_month
         )
         df = df.join(total.T, how="right")
@@ -194,7 +193,7 @@ class Pit38USDSchwabCalculator:
     @cached_property
     def remaining(self) -> float:
         curr_rate = self.exchange_rates[max(self.exchange_rates)]._1USD
-        remaining_usd = 0.0
+        remaining = 0.0
         stocks = {}
         for share in self.schwab_buy_actions:
             if share.Symbol not in stocks:
@@ -203,5 +202,10 @@ class Pit38USDSchwabCalculator:
                     .history(period="1d")["Close"]
                     .iloc[0]
                 )
-            remaining_usd += stocks[share.Symbol]
-        return remaining_usd * curr_rate
+            remaining += (
+                stocks[share.Symbol] * curr_rate - 0.0
+                if pd.isnull(share.PurchasePrice)
+                else share.PurchasePrice
+                * self.exchange_rates[share.Date]._1USD
+            )
+        return remaining
