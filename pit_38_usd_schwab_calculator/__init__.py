@@ -28,26 +28,22 @@ class Format:
 @dataclass
 class Finance:
     gross: float = 0.0
-    cost: float = 0.0
-    net: float = field(init=False)
     tax: float = field(init=False)
-    net_tax: float = field(init=False)
+    net: float = field(init=False)
 
     def __post_init__(self) -> None:
-        self.net = self.gross - self.cost
-        self.tax = self.net * 0.19
-        self.net_tax = self.net - self.tax
+        self.tax = self.gross * 0.19
+        self.net = self.gross - self.tax
 
     def __add__(self, other: "Finance") -> "Finance":
-        return Finance(
-            gross=self.gross + other.gross, cost=self.cost + other.cost
-        )
+        return Finance(self.gross + other.gross)
 
 
 @dataclass
 class State:
     employment_date: np.datetime64
-    net_salary_per_month: float
+    salary_gross_per_month: float
+    salary_net_per_month: float
     bought: List[pd.Series] = field(init=False)
     finances: Dict[int, Finance] = field(init=False)
 
@@ -60,22 +56,25 @@ class State:
 
     @property
     def to_frame(self) -> pd.DataFrame:
-        df = pd.DataFrame(
-            {
-                k: {k1.replace("_", "-"): v1 for k1, v1 in v.__dict__.items()}
-                for k, v in self.finances.items()
-            }
-        )
+        df = pd.DataFrame({k: v.__dict__ for k, v in self.finances.items()})
         total = df.sum(axis=1).to_frame("total").T
-        total["remaining-tax"] = self.remaining * 0.81
-        total["[(net-tax)+(remaining-tax)]/month"] = (
-            (total["net-tax"] + total["remaining-tax"])
-            / (datetime.now() - self.employment_date).days
-            * 30
+        remaining_gross = self.remaining
+        remaining_net = remaining_gross * 0.81
+        months = (datetime.now() - self.employment_date).days / 30
+        total["gross / month"] = total["gross"] / months
+        total["gross + remaining_gross / month"] = (
+            total["gross / month"] + remaining_gross / months
         )
-        total["[(net-tax)+(remaining-tax)+(salary-tax)]/month"] = (
-            total["[(net-tax)+(remaining-tax)]/month"]
-            + self.net_salary_per_month
+        total["gross + remaining_gross + salary_gross / month"] = (
+            total["gross + remaining_gross / month"]
+            + self.salary_gross_per_month
+        )
+        total["net / month"] = total["net"] / months
+        total["net + remaining_net / month"] = (
+            total["net / month"] + remaining_net / months
+        )
+        total["net + remaining_net + salary_net / month"] = (
+            total["net + remaining_net / month"] + self.salary_net_per_month
         )
         return df.join(total.T, how="right")
 
@@ -143,7 +142,7 @@ class State:
                 bought_row["Date"], "1USD"
             ]
             bought_pln = bought_row["PurchasePrice"] * exchange_rate_bought
-            self.finances[date.year] += Finance(gross=pln, cost=bought_pln)
+            self.finances[date.year] += Finance(pln - bought_pln)
             print(
                 f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
                 f"{row['Action']} {formatting}1 {bought_row['Description']}",
@@ -172,7 +171,7 @@ class State:
             bought_row = self.bought.pop(0)
             formatting = getattr(Format, bought_row["Description"])
             pln = row["SalePrice"] * exchange_rate
-            self.finances[date.year] += Finance(gross=pln)
+            self.finances[date.year] += Finance(pln)
             print(
                 f"[\033[1;37m{date.strftime('%Y-%m-%d')}\033[0m]",
                 f"{row['Action']} {formatting}1 {bought_row['Description']}",
@@ -220,7 +219,13 @@ def pit_38_usd_schwab_calculator() -> None:
         help="employment date",
     )
     parser.add_argument(
-        "--net-salary-per-month",
+        "--salary-gross-per-month",
+        required=True,
+        type=float,
+        help="net salary per month",
+    )
+    parser.add_argument(
+        "--salary-net-per-month",
         required=True,
         type=float,
         help="net salary per month",
@@ -305,7 +310,8 @@ def pit_38_usd_schwab_calculator() -> None:
     EXCHANGE_RATES = exchange_rates_shifted_df.set_index("Date")
     state = State(
         employment_date=args.employment_date,
-        net_salary_per_month=args.net_salary_per_month,
+        salary_gross_per_month=args.salary_gross_per_month,
+        salary_net_per_month=args.salary_net_per_month,
     ).resolve(df[::-1])
     print(state)
 
