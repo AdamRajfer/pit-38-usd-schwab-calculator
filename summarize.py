@@ -1,3 +1,4 @@
+import logging
 from argparse import ArgumentParser, Namespace
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -117,14 +118,15 @@ class Pit38USDSchwabCalculator:
             elif schwab_action.Description == "Restricted Stock Lapse":
                 msg = f"{FormatConfig.rs}{int(schwab_action.Quantity)} {schwab_action.Description}\033[0m."
             else:
-                raise ValueError(
-                    f"Unknown description: {schwab_action.Description}!"
+                logging.warn(
+                    f"Unknown schwab description: {schwab_action.Description}!"
                 )
-            print(
-                f"[\033[1;37m{schwab_action.Date.strftime('%Y-%m-%d')}\033[0m]"
-                f" {schwab_action.Action}:"
-                f" {msg}"
-            )
+            if args.verbose:
+                print(
+                    f"[\033[1;37m{schwab_action.Date.strftime('%Y-%m-%d')}\033[0m]"
+                    f" {schwab_action.Action}:"
+                    f" {msg}"
+                )
         return annual_income_summary
 
     @cached_property
@@ -268,6 +270,12 @@ if __name__ == "__main__":
         "--employment-date",
         type=pd.to_datetime,
         help="employment date (used only for average income summary)",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="whether to print all transactions to the console",
     )
     args = parser.parse_args()
     Pit38USDSchwabCalculator(args).summarize()
