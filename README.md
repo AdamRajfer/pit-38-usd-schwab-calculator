@@ -12,11 +12,11 @@ pip install -r requirements.txt
 
 ## Summary
 
-2. Go to https://client.schwab.com/app/accounts/transactionhistory/#/.
-3. Select the account for which you want to generate the report.
-4. Select `Previous 4 Years` in `Data Range` field and press `Search`.
-5. Press `Export` at the top-right side of the page in order to download the csv file.
-6. After downloading the file, run the following command in order to get the tax summary.
+1. Go to https://client.schwab.com/app/accounts/transactionhistory/#/.
+2. Select the account for which you want to generate the report.
+3. Select `Previous 4 Years` in `Data Range` field and press `Search`.
+4. Press `Export` at the top-right side of the page in order to download the csv file.
+5. After downloading the file, run the following command in order to get the tax summary.
 
 ```bash
 python summarize.py <path_to_schwab_file>
