@@ -96,7 +96,7 @@ class Pit38USDSchwabCalculator:
                 ).days
                 * 30.4375
             )
-        print(df.to_string())
+        print(df.round(2).applymap(lambda x: f"{x:,.2f}").to_string())
 
     @cached_property
     def annual_income_summary(self) -> Dict[int, IncomeSummary]:
