@@ -26,16 +26,21 @@ class FormatConfig:
 
 @dataclass
 class IncomeSummary:
-    gross: float = 0.0
+    income: float = 0.0
+    cost: float = 0.0
+    gross: float = field(init=False)
     tax: float = field(init=False)
     net: float = field(init=False)
 
     def __post_init__(self) -> None:
+        self.gross = self.income - self.cost
         self.tax = self.gross * 0.19
         self.net = self.gross - self.tax
 
     def __add__(self, other: "IncomeSummary") -> "IncomeSummary":
-        return IncomeSummary(self.gross + other.gross)
+        return IncomeSummary(
+            income=self.income + other.income, cost=self.cost + other.cost
+        )
 
 
 @dataclass
@@ -81,13 +86,7 @@ class Pit38USDSchwabCalculator:
         df = pd.DataFrame(
             {k: v.__dict__ for k, v in self.annual_income_summary.items()}
         )
-        df["remaining"] = pd.Series(
-            {
-                "gross": self.remaining,
-                "tax": self.remaining * 0.19,
-                "net": self.remaining * 0.81,
-            }
-        )
+        df["remaining"] = pd.Series(self.remaining.__dict__)
         df["total"] = df.sum(axis=1)
         if self.args.employment_date is not None:
             df["total/month"] = (
@@ -211,10 +210,10 @@ class Pit38USDSchwabCalculator:
         return {k: ExchangeRates(**{usd.name: v}) for k, v in usd.items()}
 
     @cached_property
-    def remaining(self) -> float:
+    def remaining(self) -> IncomeSummary:
         curr_rate = self.exchange_rates[max(self.exchange_rates)]._1USD
-        remaining = 0.0
         stocks = {}
+        income_summary = IncomeSummary()
         for share in self.schwab_buy_actions:
             if share.Symbol not in stocks:
                 stocks[share.Symbol] = (
@@ -222,13 +221,14 @@ class Pit38USDSchwabCalculator:
                     .history(period="1d")["Close"]
                     .iloc[0]
                 )
-            remaining += (
-                stocks[share.Symbol] * curr_rate - 0.0
-                if pd.isnull(share.PurchasePrice)
-                else share.PurchasePrice
-                * self.exchange_rates[share.Date]._1USD
+            purchase_price = (
+                0.0 if pd.isnull(share.PurchasePrice) else share.PurchasePrice
             )
-        return remaining
+            income_summary += IncomeSummary(
+                income=stocks[share.Symbol] * curr_rate,
+                cost=purchase_price,
+            )
+        return income_summary
 
     def _buy(self, schwab_action: SchwabAction) -> str:
         purchase_price = (
@@ -254,10 +254,10 @@ class Pit38USDSchwabCalculator:
                 else schwab_buy_action.PurchasePrice
             )
             annual_income_summary[schwab_action.Date.year] += IncomeSummary(
-                schwab_action.SalePrice
-                * self.exchange_rates[schwab_action.Date]._1USD
-                - purchase_price
-                * self.exchange_rates[schwab_buy_action.Date]._1USD
+                income=schwab_action.SalePrice
+                * self.exchange_rates[schwab_action.Date]._1USD,
+                cost=purchase_price
+                * self.exchange_rates[schwab_buy_action.Date]._1USD,
             )
             msg += f"\n  -> {getattr(FormatConfig, schwab_buy_action.Description.lower())}1 {schwab_buy_action.Description} share\033[0m for {schwab_action.SalePrice * self.exchange_rates[schwab_action.Date]._1USD:.2f} PLN bought for {purchase_price * self.exchange_rates[schwab_buy_action.Date]._1USD:.2f} PLN."
         return msg
