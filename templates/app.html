@@ -21,19 +21,26 @@
       }
       .logs-container {
         background-color: #f5f5f5;
-        padding: 10px;
+        padding: 1px;
         border: 1px solid #ccc;
         border-radius: 5px;
         margin: 20px auto;
-        max-width: 35%;
+        max-width: 50%;
         text-align: left;
-        white-space: pre-wrap;
         font-family: monospace;
       }
     </style>
   </head>
   <body>
     <h1>PIT-38 USD/PLN Schwab Summarizer</h1>
+    <div class="logs-container">
+      <ol>
+        <li>Go to <a href="https://client.schwab.com/app/accounts/transactionhistory/#/">https://client.schwab.com/app/accounts/transactionhistory/#/</a>.</li>
+        <li>Select the account for which you want to generate the report.</li>
+        <li>Select "Previous 4 Years" in Data Range field and press Search.</li>
+        <li>Press Export at the top-right side of the page in order to download the CSV file.</li>
+      </ol>
+    </div>
     <form action="/" method="post" enctype="multipart/form-data">
       <label for="file">Select schwab csv file:</label>
       <input type="file" name="file" id="file">
@@ -45,7 +52,7 @@
     {% endif %}
     {% if captured_output %}
       <h2>Transaction History</h2>
-      <div class="logs-container">{{ captured_output|safe }}</div>
+      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_output|safe }}</div>
     {% endif %}
   </body>
 </html>
