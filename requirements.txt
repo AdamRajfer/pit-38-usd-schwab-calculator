@@ -1,2 +1,4 @@
+ansi2html
+flask
 pandas
 yfinance

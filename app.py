@@ -1,14 +1,19 @@
 import logging
-from argparse import ArgumentParser, Namespace
+import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cached_property
+from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import yfinance as yf
+from ansi2html import Ansi2HTMLConverter
+from flask import Flask, render_template, request
+
+app = Flask(__name__)
 
 
 def try_to_float(x: Any) -> Optional[float]:
@@ -17,6 +22,20 @@ def try_to_float(x: Any) -> Optional[float]:
         return float(x.replace(",", "."))
     except (AttributeError, ValueError, AssertionError, TypeError):
         return None
+
+
+class CaptureStdoutInHTML:
+    def __enter__(self) -> "CaptureStdoutInHTML":
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+
+    def __exit__(self, type: Any, value: Any, traceback: Any) -> None:
+        self.content = self._stringio.getvalue()
+        sys.stdout = self._stdout
+
+    def get_html_content(self) -> str:
+        return Ansi2HTMLConverter().convert(self.content, full=False)
 
 
 class FormatConfig:
@@ -78,25 +97,41 @@ class ExchangeRates:
 
 
 class Pit38USDSchwabCalculator:
-    def __init__(self, args: Namespace) -> None:
-        self.args = args
+    def __init__(
+        self,
+        path: Path,
+        employment_date: Optional[datetime] = None,
+        verbose: bool = False,
+    ) -> None:
+        self.path = path
+        self.employment_date = employment_date
+        self.verbose = verbose
         self.schwab_buy_actions: List[SchwabAction] = []
 
-    def summarize(self) -> None:
+    def summarize(self) -> str:
         df = pd.DataFrame(
             {k: v.__dict__ for k, v in self.annual_income_summary.items()}
         )
         df["remaining"] = pd.Series(self.remaining.__dict__)
         df["total"] = df.sum(axis=1)
-        if self.args.employment_date is not None:
+        if self.employment_date is not None:
             df["total/month"] = (
                 df["total"]
-                / (
-                    datetime.now() - pd.to_datetime(self.args.employment_date)
-                ).days
+                / (datetime.now() - pd.to_datetime(self.employment_date)).days
                 * 30.4375
             )
-        print(df.round(2).map(lambda x: f"{x:,.2f}").to_string())
+        df.index = [x.capitalize() for x in df.index]
+        df.columns = [
+            x.capitalize() if isinstance(x, str) else x for x in df.columns
+        ]
+        return (
+            df.style.format("{:,.2f}")
+            .set_table_styles(
+                [{"selector": "th, td", "props": [("text-align", "right")]}],
+                overwrite=False,
+            )
+            .to_html()
+        )
 
     @cached_property
     def annual_income_summary(self) -> Dict[int, IncomeSummary]:
@@ -120,7 +155,7 @@ class Pit38USDSchwabCalculator:
                 logging.warn(
                     f"Unknown schwab description: {schwab_action.Description}!"
                 )
-            if args.verbose:
+            if self.verbose:
                 print(
                     f"[\033[1;37m{schwab_action.Date.strftime('%Y-%m-%d')}\033[0m]"
                     f" {schwab_action.Action}:"
@@ -130,7 +165,7 @@ class Pit38USDSchwabCalculator:
 
     @cached_property
     def schwab_actions(self) -> List[SchwabAction]:
-        df = pd.read_csv(self.args.path)
+        df = pd.read_csv(self.path)
         df["Date"] = pd.to_datetime(df["Date"])
         df_notnull = df[df["Date"].notna()].dropna(axis=1, how="all")
         curr = 0
@@ -263,19 +298,22 @@ class Pit38USDSchwabCalculator:
         return msg
 
 
+@app.route("/", methods=["GET", "POST"])
+def main():
+    if request.method == "POST":
+        file_ = request.files["file"]
+        if file_:
+            with CaptureStdoutInHTML() as captured_output:
+                summary = Pit38USDSchwabCalculator(
+                    file_, verbose=True
+                ).summarize()
+            return render_template(
+                "app.html",
+                result=summary,
+                captured_output=captured_output.get_html_content(),
+            )
+    return render_template("app.html", result=None, captured_output=None)
+
+
 if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("path", type=Path, help="path to schwab csv file")
-    parser.add_argument(
-        "--employment-date",
-        type=pd.to_datetime,
-        help="employment date (used only for average income summary)",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="whether to print all transactions to the console",
-    )
-    args = parser.parse_args()
-    Pit38USDSchwabCalculator(args).summarize()
+    app.run(debug=True, host="0.0.0.0")
