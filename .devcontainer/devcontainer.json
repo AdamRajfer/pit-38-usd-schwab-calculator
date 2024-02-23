@@ -1,9 +1,7 @@
 {
     "runArgs": [
         "--network",
-        "host",
-        "--gpus",
-        "all"
+        "host"
     ],
     "mounts": [
         "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached,readonly",
@@ -12,6 +10,6 @@
     "workspaceFolder": "${localWorkspaceFolder}",
     "privileged": true,
     "initializeCommand": "bash .devcontainer/startup.sh",
-    "onCreateCommand": "pip install -e .",
+    "onCreateCommand": "pip install -r requirements.txt",
     "image": "python:3---devcontainer"
 }
