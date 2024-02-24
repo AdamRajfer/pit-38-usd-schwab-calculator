@@ -64,7 +64,7 @@
       {{ summary|safe }}
     {% endif %}
     {% if captured_stderr_output %}
-      <h2 style="text-align: center;">Errors</h2>
+      <h2 style="text-align: center;">Warnings</h2>
       <div class="logs-container" style="white-space: pre-wrap;">{{ captured_stderr_output|safe }}</div>
     {% endif %}
     {% if captured_stdout_output %}
