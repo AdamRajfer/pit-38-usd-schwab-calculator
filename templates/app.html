@@ -63,13 +63,13 @@
       <h2 style="text-align: center;">Summary (PLN)</h2>
       {{ summary|safe }}
     {% endif %}
-    {% if captured_stderr_output %}
+    {% if captured_stderr %}
       <h2 style="text-align: center;">Warnings</h2>
-      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_stderr_output|safe }}</div>
+      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_stderr|safe }}</div>
     {% endif %}
-    {% if captured_stdout_output %}
+    {% if captured_stdout %}
       <h2 style="text-align: center;">Transaction History</h2>
-      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_stdout_output|safe }}</div>
+      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_stdout|safe }}</div>
     {% endif %}
   </body>
 </html>
