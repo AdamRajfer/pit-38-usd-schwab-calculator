@@ -1,4 +1,3 @@
-import logging
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -27,20 +26,27 @@ def try_to_float(x: Any) -> Optional[float]:
 class CaptureStdoutInHTML:
     def __enter__(self) -> "CaptureStdoutInHTML":
         self._stdout = sys.stdout
-        sys.stdout = self._stringio = StringIO()
+        self._stderr = sys.stderr
+        sys.stdout = StringIO()
+        sys.stderr = StringIO()
         return self
 
     def __exit__(self, type: Any, value: Any, traceback: Any) -> None:
-        self.content = self._stringio.getvalue()
+        self.stdout_content = sys.stdout.getvalue()  # type: ignore
+        self.stderr_content = sys.stderr.getvalue()  # type: ignore
         sys.stdout = self._stdout
+        sys.stderr = self._stderr
 
-    def get_html_content(self) -> str:
-        return Ansi2HTMLConverter().convert(self.content, full=False)
+    @property
+    def html_stdout_content(self) -> str:
+        return self._get_html_content(self.stdout_content)
 
+    @property
+    def html_stderr_content(self) -> str:
+        return self._get_html_content(self.stderr_content)
 
-class FormatConfig:
-    espp: str = "\033[38;5;208m"
-    rs: str = "\033[35m"
+    def _get_html_content(self, content: str) -> str:
+        return Ansi2HTMLConverter().convert(content, full=False)
 
 
 @dataclass
@@ -101,11 +107,9 @@ class Pit38USDSchwabCalculator:
         self,
         path: Path,
         employment_date: Optional[datetime] = None,
-        verbose: bool = False,
     ) -> None:
         self.path = path
         self.employment_date = employment_date
-        self.verbose = verbose
         self.schwab_buy_actions: List[SchwabAction] = []
 
     def summarize(self) -> str:
@@ -139,6 +143,7 @@ class Pit38USDSchwabCalculator:
             IncomeSummary
         )
         for schwab_action in self.schwab_actions:
+            error = False
             if schwab_action.Description in ["ESPP", "RS"]:
                 msg = self._buy(schwab_action)
             elif schwab_action.Description == "Share Sale":
@@ -150,17 +155,18 @@ class Pit38USDSchwabCalculator:
             ]:
                 msg = f"{schwab_action.Amount:.2f} USD."
             elif schwab_action.Description == "Restricted Stock Lapse":
-                msg = f"{FormatConfig.rs}{int(schwab_action.Quantity)} {schwab_action.Description}\033[0m."
+                msg = f"{int(schwab_action.Quantity)}."
             else:
-                logging.warn(
-                    f"Unknown schwab description: {schwab_action.Description}!"
-                )
-            if self.verbose:
-                print(
-                    f"[\033[1;37m{schwab_action.Date.strftime('%Y-%m-%d')}\033[0m]"
-                    f" {schwab_action.Action}:"
-                    f" {msg}"
-                )
+                msg = f"Unknown action! The summary may not be adequate."
+                error = True
+            msg = (
+                f"[{schwab_action.Date.strftime('%Y-%m-%d')}]"
+                f" {schwab_action.Action} ({schwab_action.Description}):"
+                f" {msg}"
+            )
+            print(msg)
+            if error:
+                print(msg, file=sys.stderr)
         return annual_income_summary
 
     @cached_property
@@ -273,7 +279,7 @@ class Pit38USDSchwabCalculator:
         )
         for _ in range(int(schwab_action.Quantity)):
             self.schwab_buy_actions.append(schwab_action)
-        return f"{getattr(FormatConfig, schwab_action.Description.lower())}{int(schwab_action.Quantity)} ESPP shares\033[0m for {purchase_price * self.exchange_rates[schwab_action.Date]._1USD * int(schwab_action.Quantity):.2f} PLN."
+        return f"{int(schwab_action.Quantity)} ESPP shares for {purchase_price * self.exchange_rates[schwab_action.Date]._1USD * int(schwab_action.Quantity):.2f} PLN."
 
     def _sell(
         self,
@@ -294,7 +300,7 @@ class Pit38USDSchwabCalculator:
                 cost=purchase_price
                 * self.exchange_rates[schwab_buy_action.Date]._1USD,
             )
-            msg += f"\n  -> {getattr(FormatConfig, schwab_buy_action.Description.lower())}1 {schwab_buy_action.Description} share\033[0m for {schwab_action.SalePrice * self.exchange_rates[schwab_action.Date]._1USD:.2f} PLN bought for {purchase_price * self.exchange_rates[schwab_buy_action.Date]._1USD:.2f} PLN."
+            msg += f"\n  -> 1 {schwab_buy_action.Description} share for {schwab_action.SalePrice * self.exchange_rates[schwab_action.Date]._1USD:.2f} PLN bought for {purchase_price * self.exchange_rates[schwab_buy_action.Date]._1USD:.2f} PLN."
         return msg
 
 
@@ -304,15 +310,19 @@ def main():
         file_ = request.files["file"]
         if file_:
             with CaptureStdoutInHTML() as captured_output:
-                summary = Pit38USDSchwabCalculator(
-                    file_, verbose=True
-                ).summarize()
+                summary = Pit38USDSchwabCalculator(file_).summarize()
             return render_template(
                 "app.html",
                 result=summary,
-                captured_output=captured_output.get_html_content(),
+                captured_stdout_output=captured_output.html_stdout_content,
+                captured_stderr_output=captured_output.html_stderr_content,
             )
-    return render_template("app.html", result=None, captured_output=None)
+    return render_template(
+        "app.html",
+        result=None,
+        captured_stdout_output=None,
+        captured_stderr_output=None,
+    )
 
 
 if __name__ == "__main__":

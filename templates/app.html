@@ -50,9 +50,13 @@
       <h2>Summary (PLN)</h2>
       {{ result|safe }}
     {% endif %}
-    {% if captured_output %}
+    {% if captured_stderr_output %}
+      <h2>Errors</h2>
+      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_stderr_output|safe }}</div>
+    {% endif %}
+    {% if captured_stdout_output %}
       <h2>Transaction History</h2>
-      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_output|safe }}</div>
+      <div class="logs-container" style="white-space: pre-wrap;">{{ captured_stdout_output|safe }}</div>
     {% endif %}
   </body>
 </html>
