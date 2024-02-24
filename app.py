@@ -123,9 +123,9 @@ class Pit38USDSchwabCalculator:
                 / (datetime.now() - pd.to_datetime(self.employment_date)).days
                 * 30.4375
             )
-        df.index = [x.capitalize() for x in df.index]
+        df.index = [x[0].upper() + x[1:] for x in df.index]
         df.columns = [
-            x.capitalize() if isinstance(x, str) else x for x in df.columns
+            x[0].upper() + x[1:] if isinstance(x, str) else x for x in df.columns
         ]
         return (
             df.style.format("{:,.2f}")
