@@ -118,7 +118,7 @@ class Pit38USDSchwabCalculator:
         df["remaining"] = pd.Series(self.remaining.__dict__)
         df["total"] = df.sum(axis=1)
         if self.employment_date is not None:
-            df["total/month"] = (
+            df["Total/Month"] = (
                 df["total"]
                 / (datetime.now() - pd.to_datetime(self.employment_date)).days
                 * 30.4375
