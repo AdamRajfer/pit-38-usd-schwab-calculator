@@ -10,3 +10,5 @@ cd pit-38-usd-schwab-calculator
 docker-compose up
 cd ..
 ```
+
+![demo](imgs/demo.jpg)
