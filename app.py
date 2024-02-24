@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cached_property
 from io import StringIO
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -105,8 +104,8 @@ class ExchangeRates:
 class Pit38USDSchwabCalculator:
     def __init__(
         self,
-        path: Path,
-        employment_date: Optional[datetime] = None,
+        path: str,
+        employment_date: Optional[str] = None,
     ) -> None:
         self.path = path
         self.employment_date = employment_date
@@ -305,23 +304,25 @@ class Pit38USDSchwabCalculator:
 
 
 @app.route("/", methods=["GET", "POST"])
-def main():
+def main() -> str:
+    summary: Optional[str] = None
+    captured_stdout_output: Optional[str] = None
+    captured_stderr_output: Optional[str] = None
     if request.method == "POST":
-        file_ = request.files["file"]
+        file_ = request.files["file"] or None
+        employment_date = request.form["employment-date"] or None
         if file_:
             with CaptureStdoutInHTML() as captured_output:
-                summary = Pit38USDSchwabCalculator(file_).summarize()
-            return render_template(
-                "app.html",
-                result=summary,
-                captured_stdout_output=captured_output.html_stdout_content,
-                captured_stderr_output=captured_output.html_stderr_content,
-            )
+                summary = Pit38USDSchwabCalculator(
+                    file_, employment_date
+                ).summarize()
+            captured_stdout_output = captured_output.html_stdout_content
+            captured_stderr_output = captured_output.html_stderr_content
     return render_template(
         "app.html",
-        result=None,
-        captured_stdout_output=None,
-        captured_stderr_output=None,
+        summary=summary,
+        captured_stdout_output=captured_stdout_output,
+        captured_stderr_output=captured_stderr_output,
     )
 
 
