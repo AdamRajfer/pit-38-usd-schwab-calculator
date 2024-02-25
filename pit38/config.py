@@ -28,8 +28,12 @@ class IncomeSummary:
 class AnnualIncomeSummary(defaultdict):
     def __init__(self) -> None:
         super().__init__(IncomeSummary)
-    
-    def to_frame(self, remaining: IncomeSummary, employment_date: Optional[datetime] = None) -> pd.DataFrame:
+
+    def to_frame(
+        self,
+        remaining: IncomeSummary,
+        employment_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
         self["Remaining"] = remaining
         df = pd.DataFrame({k: v.__dict__ for k, v in self.items()})
         df = df.assign(Total=df.sum(axis=1))

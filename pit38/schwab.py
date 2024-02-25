@@ -17,9 +17,9 @@ from pit38.utils import try_to_float
 
 class Schwab:
     def __init__(self) -> None:
-        self.schwab_actions: List[SchwabAction] = []
-        self.exchange_rates: Dict[datetime, ExchangeRates] = {}
-        self.schwab_buy_actions: List[SchwabAction] = []
+        self.schwab_actions: Optional[List[SchwabAction]] = None
+        self.exchange_rates: Optional[Dict[datetime, ExchangeRates]] = None
+        self.schwab_buy_actions: Optional[List[SchwabAction]] = None
         self.summary: Optional[AnnualIncomeSummary] = None
         self.remaining: Optional[IncomeSummary] = None
 
@@ -73,10 +73,13 @@ class Schwab:
             )
             .astype(float)
         )
-        self.schwab_actions = df[::-1].apply(lambda x: SchwabAction(*x), axis=1).tolist()
+        self.schwab_actions = (
+            df[::-1].apply(lambda x: SchwabAction(*x), axis=1).tolist()
+        )
         return self
 
     def load_exchange_rates(self) -> "Schwab":
+        assert self.schwab_actions is not None
         df_list: List[pd.DataFrame] = []
         for year in set(
             [action.Date.year for action in self.schwab_actions]
@@ -101,10 +104,13 @@ class Schwab:
             df.columns = [f"_{x}" if x[0].isdigit() else x for x in df.columns]
             df_list.append(df)
         usd = pd.concat(df_list).sort_index().shift()["_1USD"]
-        self.exchange_rates = {k: ExchangeRates(**{usd.name: v}) for k, v in usd.items()}
+        self.exchange_rates = {
+            k: ExchangeRates(**{usd.name: v}) for k, v in usd.items()
+        }
         return self
 
     def summarize_annual(self) -> "Schwab":
+        assert self.schwab_actions is not None
         schwab_buy_actions: List[SchwabAction] = []
         summary = AnnualIncomeSummary()
         for schwab_action in self.schwab_actions:
@@ -137,6 +143,8 @@ class Schwab:
         return self
 
     def calculate_remaining(self) -> "Schwab":
+        assert self.exchange_rates is not None
+        assert self.schwab_buy_actions is not None
         curr_rate = self.exchange_rates[max(self.exchange_rates)]._1USD
         stocks = {}
         remaining = IncomeSummary()
@@ -156,12 +164,20 @@ class Schwab:
             )
         self.remaining = remaining
         return self
-    
-    def to_frame(self, employment_date: Optional[datetime] = None) -> pd.DataFrame:
+
+    def to_frame(
+        self, employment_date: Optional[datetime] = None
+    ) -> pd.DataFrame:
         assert self.summary is not None
+        assert self.remaining is not None
         return self.summary.to_frame(self.remaining, employment_date)
 
-    def _buy(self, schwab_action: SchwabAction, schwab_buy_actions: List[SchwabAction]) -> str:
+    def _buy(
+        self,
+        schwab_action: SchwabAction,
+        schwab_buy_actions: List[SchwabAction],
+    ) -> str:
+        assert self.exchange_rates is not None
         purchase_price = (
             0.0
             if pd.isnull(schwab_action.PurchasePrice)
@@ -171,7 +187,13 @@ class Schwab:
             schwab_buy_actions.append(schwab_action)
         return f"{int(schwab_action.Quantity)} ESPP shares for {purchase_price * self.exchange_rates[schwab_action.Date]._1USD * int(schwab_action.Quantity):.2f} PLN."
 
-    def _sell(self, schwab_action: SchwabAction, schwab_buy_actions: List[SchwabAction], summary: AnnualIncomeSummary) -> str:
+    def _sell(
+        self,
+        schwab_action: SchwabAction,
+        schwab_buy_actions: List[SchwabAction],
+        summary: AnnualIncomeSummary,
+    ) -> str:
+        assert self.exchange_rates is not None
         msg = ""
         for _ in range(int(schwab_action.Shares)):
             schwab_buy_action = schwab_buy_actions.pop(0)
