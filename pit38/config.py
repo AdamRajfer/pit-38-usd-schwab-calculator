@@ -34,12 +34,12 @@ class AnnualIncomeSummary(defaultdict):
         remaining: IncomeSummary,
         employment_date: Optional[datetime] = None,
     ) -> pd.DataFrame:
-        self["Remaining"] = remaining
+        self["remaining"] = remaining
         df = pd.DataFrame({k: v.__dict__ for k, v in self.items()})
-        df = df.assign(Total=df.sum(axis=1))
+        df = df.assign(total=df.sum(axis=1))
         if employment_date is not None:
-            months = (datetime.now() - employment_date).days * 30.4375
-            df["Total/Month"] = df["Total"] / months
+            months = (datetime.now() - employment_date).days / 30.4375
+            df["total/tonth"] = df["total"] / months
         return df
 
 
