@@ -10,6 +10,6 @@
     "workspaceFolder": "${localWorkspaceFolder}",
     "privileged": true,
     "initializeCommand": "bash .devcontainer/startup.sh",
-    "onCreateCommand": "pip install -r requirements.txt",
+    "onCreateCommand": "pip install poetry && poetry install",
     "image": "python:3---devcontainer"
 }

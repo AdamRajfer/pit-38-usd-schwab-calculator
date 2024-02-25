@@ -1,5 +1,6 @@
 from typing import Optional
 
+import pandas as pd
 from flask import Flask, render_template, request
 
 from pit38.html_utils import CaptureStdIntoHTML
@@ -15,24 +16,10 @@ def main() -> str:
     captured_stderr: Optional[str] = None
     if request.method == "POST":
         file_ = request.files["file"] or None
-        employment_date = request.form["employment-date"] or None
+        employment_date = pd.to_datetime(request.form["employment-date"]) if request.form["employment-date"] else None
         if file_:
             with CaptureStdIntoHTML() as captured:
-                summary = (
-                    Schwab(file_, employment_date)
-                    .summarize()
-                    .style.format("{:,.2f}")
-                    .set_table_styles(
-                        [
-                            {
-                                "selector": "th, td",
-                                "props": [("text-align", "right")],
-                            }
-                        ],
-                        overwrite=False,
-                    )
-                    .to_html()
-                )
+                summary = Schwab().load_schwab_actions(file_).load_exchange_rates().summarize_annual().calculate_remaining().to_frame(employment_date).style.format("{:,.2f}").set_table_styles([{"selector": "th, td", "props": [("text-align", "right")]}], overwrite=False).to_html()
             captured_stdout = captured.html_stdout_content
             captured_stderr = captured.html_stderr_content
     return render_template(

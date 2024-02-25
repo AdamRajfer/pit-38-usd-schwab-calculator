@@ -1,80 +1,30 @@
 import sys
 from collections import defaultdict
 from datetime import datetime
-from functools import cached_property
 from typing import Dict, List, Optional
 
 import pandas as pd
 import yfinance as yf
 
-from pit38.config import ExchangeRates, IncomeSummary, SchwabAction
+from pit38.config import (
+    AnnualIncomeSummary,
+    ExchangeRates,
+    IncomeSummary,
+    SchwabAction,
+)
 from pit38.utils import try_to_float
 
 
 class Schwab:
-    def __init__(
-        self,
-        path: str,
-        employment_date: Optional[str] = None,
-    ) -> None:
-        self.path = path
-        self.employment_date = employment_date
+    def __init__(self) -> None:
+        self.schwab_actions: List[SchwabAction] = []
+        self.exchange_rates: Dict[datetime, ExchangeRates] = {}
         self.schwab_buy_actions: List[SchwabAction] = []
+        self.summary: Optional[AnnualIncomeSummary] = None
+        self.remaining: Optional[IncomeSummary] = None
 
-    def summarize(self) -> pd.DataFrame:
-        df = pd.DataFrame(
-            {k: v.__dict__ for k, v in self.annual_income_summary.items()}
-        )
-        df["remaining"] = pd.Series(self.remaining.__dict__)
-        df["total"] = df.sum(axis=1)
-        if self.employment_date is not None:
-            df["total/Month"] = (
-                df["total"]
-                / (datetime.now() - pd.to_datetime(self.employment_date)).days
-                * 30.4375
-            )
-        df.index = [x[0].upper() + x[1:] for x in df.index]
-        df.columns = [
-            x[0].upper() + x[1:] if isinstance(x, str) else x
-            for x in df.columns
-        ]
-        return df
-
-    @cached_property
-    def annual_income_summary(self) -> Dict[int, IncomeSummary]:
-        annual_income_summary: Dict[int, IncomeSummary] = defaultdict(
-            IncomeSummary
-        )
-        for schwab_action in self.schwab_actions:
-            error = False
-            if schwab_action.Description in ["ESPP", "RS"]:
-                msg = self._buy(schwab_action)
-            elif schwab_action.Description == "Share Sale":
-                msg = self._sell(schwab_action, annual_income_summary)
-            elif schwab_action.Description in [
-                "Cash Disbursement",
-                "Debit",
-                "Credit",
-            ]:
-                msg = f"{schwab_action.Amount:.2f} USD."
-            elif schwab_action.Description == "Restricted Stock Lapse":
-                msg = f"{int(schwab_action.Quantity)}."
-            else:
-                msg = f"Unknown action! The summary may not be adequate."
-                error = True
-            msg = (
-                f"[{schwab_action.Date.strftime('%Y-%m-%d')}]"
-                f" {schwab_action.Action} ({schwab_action.Description}):"
-                f" {msg}"
-            )
-            print(msg)
-            if error:
-                print(msg, file=sys.stderr)
-        return annual_income_summary
-
-    @cached_property
-    def schwab_actions(self) -> List[SchwabAction]:
-        df = pd.read_csv(self.path)
+    def load_schwab_actions(self, path: str) -> "Schwab":
+        df = pd.read_csv(path)
         df["Date"] = pd.to_datetime(df["Date"])
         df_notnull = df[df["Date"].notna()].dropna(axis=1, how="all")
         curr = 0
@@ -123,10 +73,10 @@ class Schwab:
             )
             .astype(float)
         )
-        return df[::-1].apply(lambda x: SchwabAction(*x), axis=1).tolist()
+        self.schwab_actions = df[::-1].apply(lambda x: SchwabAction(*x), axis=1).tolist()
+        return self
 
-    @cached_property
-    def exchange_rates(self) -> Dict[datetime, ExchangeRates]:
+    def load_exchange_rates(self) -> "Schwab":
         df_list: List[pd.DataFrame] = []
         for year in set(
             [action.Date.year for action in self.schwab_actions]
@@ -151,13 +101,45 @@ class Schwab:
             df.columns = [f"_{x}" if x[0].isdigit() else x for x in df.columns]
             df_list.append(df)
         usd = pd.concat(df_list).sort_index().shift()["_1USD"]
-        return {k: ExchangeRates(**{usd.name: v}) for k, v in usd.items()}
+        self.exchange_rates = {k: ExchangeRates(**{usd.name: v}) for k, v in usd.items()}
+        return self
 
-    @cached_property
-    def remaining(self) -> IncomeSummary:
+    def summarize_annual(self) -> "Schwab":
+        schwab_buy_actions: List[SchwabAction] = []
+        summary = AnnualIncomeSummary()
+        for schwab_action in self.schwab_actions:
+            error = False
+            if schwab_action.Action == "Deposit":
+                msg = self._buy(schwab_action, schwab_buy_actions)
+            elif schwab_action.Action == "Sale":
+                msg = self._sell(schwab_action, schwab_buy_actions, summary)
+            elif schwab_action.Action == "Lapse":
+                msg = f"{int(schwab_action.Quantity)} shares."
+            elif schwab_action.Action in [
+                "Wire Transfer",
+                "Tax Withholding",
+                "Dividend",
+            ]:
+                msg = f"{schwab_action.Amount:.2f} USD."
+            else:
+                msg = f"Unknown action! The summary may not be adequate."
+                error = True
+            msg = (
+                f"[{schwab_action.Date.strftime('%Y-%m-%d')}]"
+                f" {schwab_action.Action} ({schwab_action.Description}):"
+                f" {msg}"
+            )
+            print(msg)
+            if error:
+                print(msg, file=sys.stderr)
+        self.schwab_buy_actions = schwab_buy_actions
+        self.summary = summary
+        return self
+
+    def calculate_remaining(self) -> "Schwab":
         curr_rate = self.exchange_rates[max(self.exchange_rates)]._1USD
         stocks = {}
-        income_summary = IncomeSummary()
+        remaining = IncomeSummary()
         for share in self.schwab_buy_actions:
             if share.Symbol not in stocks:
                 stocks[share.Symbol] = (
@@ -168,36 +150,37 @@ class Schwab:
             purchase_price = (
                 0.0 if pd.isnull(share.PurchasePrice) else share.PurchasePrice
             )
-            income_summary += IncomeSummary(
+            remaining += IncomeSummary(
                 income=stocks[share.Symbol] * curr_rate,
                 cost=purchase_price,
             )
-        return income_summary
+        self.remaining = remaining
+        return self
+    
+    def to_frame(self, employment_date: Optional[datetime] = None) -> pd.DataFrame:
+        assert self.summary is not None
+        return self.summary.to_frame(self.remaining, employment_date)
 
-    def _buy(self, schwab_action: SchwabAction) -> str:
+    def _buy(self, schwab_action: SchwabAction, schwab_buy_actions: List[SchwabAction]) -> str:
         purchase_price = (
             0.0
             if pd.isnull(schwab_action.PurchasePrice)
             else schwab_action.PurchasePrice
         )
         for _ in range(int(schwab_action.Quantity)):
-            self.schwab_buy_actions.append(schwab_action)
+            schwab_buy_actions.append(schwab_action)
         return f"{int(schwab_action.Quantity)} ESPP shares for {purchase_price * self.exchange_rates[schwab_action.Date]._1USD * int(schwab_action.Quantity):.2f} PLN."
 
-    def _sell(
-        self,
-        schwab_action: SchwabAction,
-        annual_income_summary: Dict[int, IncomeSummary],
-    ) -> str:
+    def _sell(self, schwab_action: SchwabAction, schwab_buy_actions: List[SchwabAction], summary: AnnualIncomeSummary) -> str:
         msg = ""
         for _ in range(int(schwab_action.Shares)):
-            schwab_buy_action = self.schwab_buy_actions.pop(0)
+            schwab_buy_action = schwab_buy_actions.pop(0)
             purchase_price = (
                 0.0
                 if pd.isnull(schwab_buy_action.PurchasePrice)
                 else schwab_buy_action.PurchasePrice
             )
-            annual_income_summary[schwab_action.Date.year] += IncomeSummary(
+            summary[schwab_action.Date.year] += IncomeSummary(
                 income=schwab_action.SalePrice
                 * self.exchange_rates[schwab_action.Date]._1USD,
                 cost=purchase_price
