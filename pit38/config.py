@@ -39,7 +39,7 @@ class AnnualIncomeSummary(defaultdict):
         df = df.assign(total=df.sum(axis=1))
         if employment_date is not None:
             months = (datetime.now() - employment_date).days / 30.4375
-            df["total/tonth"] = df["total"] / months
+            df["total/month"] = df["total"] / months
         return df
 
 
