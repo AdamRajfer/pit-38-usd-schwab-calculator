@@ -3,6 +3,6 @@ services:
   web:
     build: .
     ports:
-      - 5000:5000
+      - 5555:5555
     environment:
       - FLASK_ENV=development
