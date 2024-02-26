@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+import pandas as pd
+
 
 @dataclass
 class SchwabAction:
@@ -29,3 +31,7 @@ class SchwabAction:
     PurchasePrice: float
     PurchaseFairMarketValue: float
     DispositionType: str
+
+    @property
+    def purchase_price(self) -> float:
+        return 0.0 if pd.isnull(self.PurchasePrice) else self.PurchasePrice

@@ -150,12 +150,9 @@ class Summarizer:
                     .history(period="1d")["Close"]
                     .iloc[0]
                 )
-            purchase_price = (
-                0.0 if pd.isnull(share.PurchasePrice) else share.PurchasePrice
-            )
             remaining += IncomeSummary(
                 income=stocks[share.Symbol] * curr_rate,
-                cost=purchase_price,
+                cost=share.purchase_price,
             )
         self.remaining = remaining
         return self
@@ -173,14 +170,9 @@ class Summarizer:
         schwab_buy_actions: List[SchwabAction],
     ) -> str:
         assert self.exchange_rates is not None
-        purchase_price = (
-            0.0
-            if pd.isnull(schwab_action.PurchasePrice)
-            else schwab_action.PurchasePrice
-        )
         for _ in range(int(schwab_action.Quantity)):
             schwab_buy_actions.append(schwab_action)
-        return f"{int(schwab_action.Quantity)} ESPP shares for {purchase_price * self.exchange_rates[schwab_action.Date] * int(schwab_action.Quantity):.2f} PLN."
+        return f"{int(schwab_action.Quantity)} ESPP shares for {schwab_action.purchase_price * self.exchange_rates[schwab_action.Date] * int(schwab_action.Quantity):.2f} PLN."
 
     def _sell(
         self,
@@ -192,16 +184,14 @@ class Summarizer:
         msg = ""
         for _ in range(int(schwab_action.Shares)):
             schwab_buy_action = schwab_buy_actions.pop(0)
-            purchase_price = (
-                0.0
-                if pd.isnull(schwab_buy_action.PurchasePrice)
-                else schwab_buy_action.PurchasePrice
+            income = (
+                schwab_action.SalePrice
+                * self.exchange_rates[schwab_action.Date]
             )
-            summary[schwab_action.Date.year] += IncomeSummary(
-                income=schwab_action.SalePrice
-                * self.exchange_rates[schwab_action.Date],
-                cost=purchase_price
-                * self.exchange_rates[schwab_buy_action.Date],
+            cost = (
+                schwab_buy_action.purchase_price
+                * self.exchange_rates[schwab_buy_action.Date]
             )
-            msg += f"\n  -> 1 {schwab_buy_action.Description} share for {schwab_action.SalePrice * self.exchange_rates[schwab_action.Date]:.2f} PLN bought for {purchase_price * self.exchange_rates[schwab_buy_action.Date]:.2f} PLN."
+            summary[schwab_action.Date.year] += IncomeSummary(income, cost)
+            msg += f"\n  -> 1 {schwab_buy_action.Description} share for {income:.2f} PLN bought for {cost:.2f} PLN."
         return msg
