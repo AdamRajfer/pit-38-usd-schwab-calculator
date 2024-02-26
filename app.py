@@ -3,8 +3,8 @@ from typing import Optional
 import pandas as pd
 from flask import Flask, render_template, request
 
-from pit38.html_utils import CaptureStdIntoHTML
-from pit38.schwab import Schwab
+from pit38.captures import CaptureStdIntoHTML
+from pit38.summarizer import Summarizer
 
 app = Flask(__name__)
 
@@ -24,7 +24,7 @@ def main() -> str:
         if file_:
             with CaptureStdIntoHTML() as captured:
                 summary = (
-                    Schwab()
+                    Summarizer()
                     .load_schwab_actions(file_)
                     .load_exchange_rates()
                     .summarize_annual()
