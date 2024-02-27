@@ -4,7 +4,7 @@ import pandas as pd
 from flask import Flask, render_template, request
 
 from pit38.captures import CaptureStdIntoHTML
-from pit38.summarizer import Summarizer
+from pit38.schwab import SchwabActions
 
 app = Flask(__name__)
 
@@ -24,11 +24,8 @@ def main() -> str:
         if file_:
             with CaptureStdIntoHTML() as captured:
                 summary = (
-                    Summarizer()
-                    .load_schwab_actions(file_)
-                    .load_exchange_rates()
-                    .summarize_annual()
-                    .calculate_remaining()
+                    SchwabActions()
+                    .summarize(file_)
                     .to_frame(employment_date)
                     .style.format("{:,.2f}")
                     .set_table_styles(
