@@ -1,5 +1,3 @@
-import sys
-import traceback
 from typing import Optional
 
 import pandas as pd
@@ -25,25 +23,11 @@ def main() -> str:
         )
         if file_:
             with CaptureStdIntoHTML() as captured:
-                try:
-                    summary = (
-                        SchwabActions()
-                        .summarize(file_)
-                        .to_frame(employment_date)
-                        .style.format("{:,.2f}")
-                        .set_table_styles(
-                            [
-                                {
-                                    "selector": "th, td",
-                                    "props": [("text-align", "right")],
-                                }
-                            ],
-                            overwrite=False,
-                        )
-                        .to_html()
-                    )
-                except Exception:
-                    traceback.print_exc(file=sys.stderr)
+                summary = (
+                    SchwabActions(file_, employment_date)
+                    .prepare_summary()
+                    .to_html()
+                )
             captured_stdout = captured.html_stdout_content
             captured_stderr = captured.html_stderr_content
     return render_template(
