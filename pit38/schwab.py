@@ -1,146 +1,27 @@
 import sys
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import datetime
-from functools import cached_property
-from typing import Dict, Hashable, List, Optional
+from typing import Dict, Hashable, Optional
 
 import pandas as pd
-import yfinance as yf
 
 from pit38.income import IncomeSummary
-from pit38.utils import try_to_float
-
-
-@dataclass
-class SchwabAction:
-    Date: datetime
-    Action: str
-    Symbol: str
-    Description: str
-    Quantity: float
-    FeesAndCommissions: float
-    Amount: float
-    Type: str
-    Shares: float
-    SalePrice: float
-    GrantId: str
-    VestDate: datetime
-    VestFairMarketValue: float
-    GrossProceeds: float
-    AwardDate: datetime
-    AwardId: str
-    FairMarketValuePrice: float
-    SharesSoldWithheldForTaxes: float
-    NetSharesDeposited: float
-    SubscriptionDate: datetime
-    SubscriptionFairMarketValue: float
-    PurchaseDate: datetime
-    PurchasePrice: float
-    PurchaseFairMarketValue: float
-    DispositionType: str
-
-    @property
-    def purchase_price(self) -> float:
-        return 0.0 if pd.isnull(self.PurchasePrice) else self.PurchasePrice
-
-
-class SchwabActionsFromFile(list[SchwabAction]):
-    def __init__(self, path: str) -> None:
-        super().__init__()
-        self.path = path
-
-    def load(self) -> "SchwabActionsFromFile":
-        df = pd.read_csv(self.path)
-        df["Date"] = pd.to_datetime(df["Date"])
-        df_notnull = df[df["Date"].notna()].dropna(axis=1, how="all")
-        curr = 0
-        data = defaultdict(list)
-        for i, row in df.iterrows():
-            if pd.isna(row["Date"]):
-                data[curr].append(row)
-            else:
-                if curr in data:
-                    data[curr] = (
-                        pd.DataFrame(data[curr])
-                        .dropna(axis=1, how="all")
-                        .assign(action_id=curr)
-                    )
-                curr = i
-        if curr in data:
-            data[curr] = (
-                pd.DataFrame(data[curr])
-                .dropna(axis=1, how="all")
-                .assign(action_id=curr)
-            )
-        df_additional = (
-            pd.concat(data.values())
-            .dropna(axis=1, how="all")
-            .set_index("action_id")
-            .rename_axis(index=None)
-        )
-        df = df_notnull.join(df_additional)
-        for col in df.columns:
-            if "Date" in col:
-                df[col] = pd.to_datetime(df[col])
-        dolar_cols = (
-            df.map(
-                lambda x: ("$" in x if isinstance(x, str) else False) or None
-            )
-            .mean()
-            .dropna()
-            .index.tolist()
-        )
-        df[dolar_cols] = (
-            df[dolar_cols]
-            .map(
-                lambda x: x.replace("$", "").replace(",", "") or None
-                if isinstance(x, str)
-                else x
-            )
-            .astype(float)
-        )
-        super().__init__(df[::-1].apply(lambda x: SchwabAction(**x), axis=1))
-        return self
-
-    @cached_property
-    def exchange_rates(self) -> Dict[datetime, float]:
-        df_list: List[pd.DataFrame] = []
-        min_year = min(action.Date.year for action in self)
-        for year in range(min_year, datetime.now().year + 1):
-            df = (
-                pd.read_csv(
-                    f"https://static.nbp.pl/dane/kursy/Archiwum/archiwum_tab_a_{year}.csv",
-                    delimiter=";",
-                    encoding="iso-8859-2",
-                    header=0,
-                    skiprows=[1],
-                )
-                .set_index("data")
-                .map(try_to_float)
-                .dropna(axis=1, how="all")
-                .dropna(axis=0, how="all")
-                .astype(float)
-                .rename_axis(index="Date")
-            )
-            df.index = pd.to_datetime(df.index)
-            df.columns = [f"_{x}" if x[0].isdigit() else x for x in df.columns]
-            df_list.append(df)
-        return pd.concat(df_list).sort_index().shift()["_1USD"].to_dict()
+from pit38.preprocessing import SchwabActionsFromFile
+from pit38.stock import SchwabAction
 
 
 class SchwabActions(list[SchwabAction]):
     def __init__(
         self, path: str, employment_date: Optional[datetime] = None
     ) -> None:
-        self.schwab_actions_from_file = SchwabActionsFromFile(path)
+        self.path = path
         self.employment_date = employment_date
         self.summary: Dict[Hashable, IncomeSummary] = defaultdict(
             IncomeSummary
         )
 
     def prepare_summary(self) -> "SchwabActions":
-        for action in self.schwab_actions_from_file.load():
+        for action in SchwabActionsFromFile(self.path).load().exchange():
             name = action.Action
             desc = action.Description
             date = action.Date
@@ -182,39 +63,23 @@ class SchwabActions(list[SchwabAction]):
         quantity = int(shares.Quantity)
         for _ in range(quantity):
             self.append(shares)
-        cost = (
-            shares.purchase_price * self.exchange_rates[shares.Date] * quantity
-        )
-        return f"{quantity} ESPP shares for {cost:.2f} PLN."
+        return f"{quantity} ESPP shares for {shares.purchase_price * quantity:.2f} PLN."
 
     def _sell(self, shares: SchwabAction) -> str:
         msg = ""
-        income = shares.SalePrice * self.exchange_rates[shares.Date]
         for _ in range(int(shares.Shares)):
             share = self.pop(0)
-            cost = share.purchase_price * self.exchange_rates[share.Date]
-            self.summary[shares.Date.year] += IncomeSummary(income, cost)
-            msg += f"\n  -> 1 {share.Description} share for {income:.2f} PLN bought for {cost:.2f} PLN."
+            self.summary[shares.Date.year] += IncomeSummary(
+                shares.sale_price, share.purchase_price
+            )
+            msg += f"\n  -> 1 {share.Description} share for {shares.sale_price:.2f} PLN bought for {share.purchase_price:.2f} PLN."
         return msg
 
     @property
     def remaining(self) -> IncomeSummary:
-        curr_rate = self.exchange_rates[max(self.exchange_rates)]
-        stocks = {}
         remaining = IncomeSummary()
         for share in self:
-            if share.Symbol not in stocks:
-                stocks[share.Symbol] = (
-                    yf.Ticker(share.Symbol)
-                    .history(period="1d")["Close"]
-                    .iloc[0]
-                )
             remaining += IncomeSummary(
-                income=stocks[share.Symbol] * curr_rate,
-                cost=share.purchase_price * self.exchange_rates[share.Date],
+                share.current_sale_price, share.purchase_price
             )
         return remaining
-
-    @property
-    def exchange_rates(self) -> Dict[datetime, float]:
-        return self.schwab_actions_from_file.exchange_rates
