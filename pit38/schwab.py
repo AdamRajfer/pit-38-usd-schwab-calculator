@@ -100,7 +100,7 @@ class SchwabActionsFromFile(list[SchwabAction]):
             )
             .astype(float)
         )
-        super().__init__(df[::-1].apply(lambda x: SchwabAction(*x), axis=1))
+        super().__init__(df[::-1].apply(lambda x: SchwabAction(**x), axis=1))
         return self
 
     @cached_property
