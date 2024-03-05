@@ -94,7 +94,7 @@ class SchwabAction:
     def sell_msg(self, sold_shares: List["SchwabAction"]) -> None:
         msg = ""
         for share in sold_shares:
-            msg += f"\n  -> 1 {self.Description} share for {self.sale_price:.2f} PLN bought for {share.purchase_price:.2f} PLN."
+            msg += f"\n  -> 1 {self.Type} share for {self.sale_price:.2f} PLN bought for {share.purchase_price:.2f} PLN."
         print(self._format_msg(msg))
 
     def lapse_msg(self) -> None:
