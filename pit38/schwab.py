@@ -211,7 +211,7 @@ class SchwabActions(list[SchwabAction]):
                 )
             remaining += IncomeSummary(
                 income=stocks[share.Symbol] * curr_rate,
-                cost=share.purchase_price,
+                cost=share.purchase_price * self.exchange_rates[share.Date],
             )
         return remaining
 
