@@ -21,27 +21,23 @@ class SchwabActions(list[SchwabAction]):
 
     def prepare_summary(self) -> "SchwabActions":
         for share in SchwabActionsFromFile(self.path).load().exchange():
-            if share.Action == "Deposit":
-                for _ in range(int(share.Quantity)):
+            if share.buying:
+                for _ in range(share.quantity):
                     self.append(share)
                 share.buy_msg()
-            elif share.Action == "Sale":
+            elif share.selling:
                 sold_shares: List[SchwabAction] = []
-                for _ in range(int(share.Shares)):
+                for _ in range(share.shares):
                     sold_shares.append(self.pop(0))
-                    self.summary[share.Date.year] += IncomeSummary(
+                    self.summary[share.year] += IncomeSummary(
                         income=share.sale_price,
                         cost=sold_shares[-1].purchase_price,
                     )
                 share.sell_msg(sold_shares)
                 del sold_shares
-            elif share.Action == "Lapse":
+            elif share.lapsing:
                 share.lapse_msg()
-            elif share.Action in [
-                "Wire Transfer",
-                "Tax Withholding",
-                "Dividend",
-            ]:
+            elif share.amounting:
                 share.amount_msg()
             else:
                 share.error_msg()

@@ -35,6 +35,9 @@ class SchwabAction:
     PurchasePrice: float
     PurchaseFairMarketValue: float
     DispositionType: str
+    year: int = field(init=False)
+    quantity: int = field(init=False)
+    shares: int = field(init=False)
     purchase_price: float = field(init=False)
     sale_price: float = field(init=False)
     current_sale_price: float = field(init=False)
@@ -42,6 +45,9 @@ class SchwabAction:
     STOCKS: ClassVar[Dict[str, float]] = {}
 
     def __post_init__(self) -> None:
+        self.year = self.Date.year
+        self.quantity = 0 if pd.isnull(self.Quantity) else int(self.Quantity)
+        self.shares = 0 if pd.isnull(self.Shares) else int(self.Shares)
         self.purchase_price = np.nan
         self.sale_price = np.nan
         self.current_sale_price = np.nan
@@ -65,8 +71,24 @@ class SchwabAction:
             reversed(SchwabAction.EXCHANGE_RATES.values())
         )
 
+    @property
+    def buying(self) -> bool:
+        return self.Action == "Deposit"
+
+    @property
+    def selling(self) -> bool:
+        return self.Action == "Sale"
+
+    @property
+    def lapsing(self) -> bool:
+        return self.Action == "Lapse"
+
+    @property
+    def amounting(self) -> bool:
+        return self.Action in ["Wire Transfer", "Tax Withholding", "Dividend"]
+
     def buy_msg(self) -> None:
-        msg = f"{int(self.Quantity)} {self.Description} shares for {self.purchase_price * self.Quantity:.2f} PLN."
+        msg = f"{self.quantity} {self.Description} shares for {self.purchase_price * self.quantity:.2f} PLN."
         print(self._format_msg(msg))
 
     def sell_msg(self, sold_shares: List["SchwabAction"]) -> None:
@@ -76,7 +98,7 @@ class SchwabAction:
         print(self._format_msg(msg))
 
     def lapse_msg(self) -> None:
-        msg = f"{int(self.Quantity)} shares."
+        msg = f"{self.quantity} shares."
         print(self._format_msg(msg))
 
     def amount_msg(self) -> None:
