@@ -1,7 +1,6 @@
-import sys
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, Hashable, Optional
+from typing import Dict, Hashable, List, Optional
 
 import pandas as pd
 
@@ -21,27 +20,37 @@ class SchwabActions(list[SchwabAction]):
         )
 
     def prepare_summary(self) -> "SchwabActions":
-        for action in SchwabActionsFromFile(self.path).load().exchange():
-            name = action.Action
-            desc = action.Description
-            date = action.Date
-            error = False
-            if name == "Deposit":
-                msg = self._buy(action)
-            elif name == "Sale":
-                msg = self._sell(action)
-            elif name == "Lapse":
-                msg = f"{int(action.Quantity)} shares."
-            elif name in ["Wire Transfer", "Tax Withholding", "Dividend"]:
-                msg = f"{action.Amount:.2f} USD."
+        for share in SchwabActionsFromFile(self.path).load().exchange():
+            if share.Action == "Deposit":
+                for _ in range(int(share.Quantity)):
+                    self.append(share)
+                share.buy_msg()
+            elif share.Action == "Sale":
+                sold_shares: List[SchwabAction] = []
+                for _ in range(int(share.Shares)):
+                    sold_shares.append(self.pop(0))
+                    self.summary[share.Date.year] += IncomeSummary(
+                        income=share.sale_price,
+                        cost=sold_shares[-1].purchase_price,
+                    )
+                share.sell_msg(sold_shares)
+                del sold_shares
+            elif share.Action == "Lapse":
+                share.lapse_msg()
+            elif share.Action in [
+                "Wire Transfer",
+                "Tax Withholding",
+                "Dividend",
+            ]:
+                share.amount_msg()
             else:
-                msg = f"Unknown action! The summary may not be adequate."
-                error = True
-            msg = f"[{date.strftime('%Y-%m-%d')}] {name} ({desc}): {msg}"
-            print(msg)
-            if error:
-                print(msg, file=sys.stderr)
-        self.summary["remaining"] = self.remaining
+                share.error_msg()
+        self.summary["remaining"] = IncomeSummary()
+        for share in self:
+            self.summary["remaining"] += IncomeSummary(
+                income=share.current_sale_price,
+                cost=share.purchase_price,
+            )
         return self
 
     def to_html(self) -> str:
@@ -58,28 +67,3 @@ class SchwabActions(list[SchwabAction]):
             )
             .to_html()
         )
-
-    def _buy(self, shares: SchwabAction) -> str:
-        quantity = int(shares.Quantity)
-        for _ in range(quantity):
-            self.append(shares)
-        return f"{quantity} ESPP shares for {shares.purchase_price * quantity:.2f} PLN."
-
-    def _sell(self, shares: SchwabAction) -> str:
-        msg = ""
-        for _ in range(int(shares.Shares)):
-            share = self.pop(0)
-            self.summary[shares.Date.year] += IncomeSummary(
-                shares.sale_price, share.purchase_price
-            )
-            msg += f"\n  -> 1 {share.Description} share for {shares.sale_price:.2f} PLN bought for {share.purchase_price:.2f} PLN."
-        return msg
-
-    @property
-    def remaining(self) -> IncomeSummary:
-        remaining = IncomeSummary()
-        for share in self:
-            remaining += IncomeSummary(
-                share.current_sale_price, share.purchase_price
-            )
-        return remaining

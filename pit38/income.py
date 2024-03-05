@@ -16,5 +16,6 @@ class IncomeSummary:
 
     def __add__(self, other: "IncomeSummary") -> "IncomeSummary":
         return IncomeSummary(
-            income=self.income + other.income, cost=self.cost + other.cost
+            income=self.income + other.income,
+            cost=self.cost + other.cost,
         )

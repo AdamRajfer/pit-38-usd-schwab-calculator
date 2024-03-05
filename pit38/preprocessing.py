@@ -4,7 +4,7 @@ from typing import Any, List, Optional
 
 import pandas as pd
 
-from pit38.stock import EXCHANGE_RATES, SchwabAction
+from pit38.stock import SchwabAction
 
 
 class SchwabActionsFromFile(list[SchwabAction]):
@@ -93,7 +93,7 @@ class SchwabActionsFromFile(list[SchwabAction]):
             df.index = pd.to_datetime(df.index)
             df.columns = [f"_{x}" if x[0].isdigit() else x for x in df.columns]
             df_list.append(df)
-        EXCHANGE_RATES.update(
+        SchwabAction.EXCHANGE_RATES.update(
             pd.concat(df_list).sort_index().shift()["_1USD"].to_dict()
         )
 
