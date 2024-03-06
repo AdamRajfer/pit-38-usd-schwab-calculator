@@ -1,11 +1,13 @@
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import ClassVar, Dict, List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+from pit38.state import AppState
 
 
 @dataclass
@@ -35,40 +37,44 @@ class SchwabAction:
     PurchasePrice: float
     PurchaseFairMarketValue: float
     DispositionType: str
+    app_state: Optional[AppState] = None
     year: int = field(init=False)
     quantity: int = field(init=False)
     shares: int = field(init=False)
     purchase_price: float = field(init=False)
     sale_price: float = field(init=False)
     current_sale_price: float = field(init=False)
-    EXCHANGE_RATES: ClassVar[Dict[datetime, float]] = {}
-    STOCKS: ClassVar[Dict[str, float]] = {}
 
     def __post_init__(self) -> None:
+        self.app_state = self.app_state or AppState()
         self.year = self.Date.year
         self.quantity = 0 if pd.isnull(self.Quantity) else int(self.Quantity)
         self.shares = 0 if pd.isnull(self.Shares) else int(self.Shares)
         self.purchase_price = np.nan
         self.sale_price = np.nan
         self.current_sale_price = np.nan
-        if pd.notnull(self.Symbol) and self.Symbol not in SchwabAction.STOCKS:
-            SchwabAction.STOCKS[self.Symbol] = (
+        if (
+            pd.notnull(self.Symbol)
+            and self.Symbol not in self.app_state.stocks
+        ):
+            self.app_state.stocks[self.Symbol] = (
                 yf.Ticker(self.Symbol).history(period="1d")["Close"].iloc[0]
             )
 
     def exchange(self) -> None:
+        assert self.app_state is not None
         self.purchase_price = (
             0.0
             if pd.isnull(self.PurchasePrice)
-            else self.PurchasePrice * SchwabAction.EXCHANGE_RATES[self.Date]
+            else self.PurchasePrice * self.app_state.exchange_rates[self.Date]
         )
         self.sale_price = (
             0.0
             if pd.isnull(self.SalePrice)
-            else self.SalePrice * SchwabAction.EXCHANGE_RATES[self.Date]
+            else self.SalePrice * self.app_state.exchange_rates[self.Date]
         )
-        self.current_sale_price = SchwabAction.STOCKS[self.Symbol] * next(
-            reversed(SchwabAction.EXCHANGE_RATES.values())
+        self.current_sale_price = self.app_state.stocks[self.Symbol] * next(
+            reversed(self.app_state.exchange_rates.values())
         )
 
     @property

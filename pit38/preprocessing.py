@@ -4,6 +4,7 @@ from typing import Any, List, Optional
 
 import pandas as pd
 
+from pit38.state import AppState
 from pit38.stock import SchwabAction
 
 
@@ -11,6 +12,7 @@ class SchwabActionsFromFile(list[SchwabAction]):
     def __init__(self, path: str) -> None:
         super().__init__()
         self.path = path
+        self.app_state = AppState()
 
     def load(self) -> "SchwabActionsFromFile":
         df = pd.read_csv(self.path)
@@ -62,7 +64,11 @@ class SchwabActionsFromFile(list[SchwabAction]):
             )
             .astype(float)
         )
-        super().__init__(df[::-1].apply(lambda x: SchwabAction(**x), axis=1))
+        super().__init__(
+            df[::-1].apply(
+                lambda x: SchwabAction(**x, app_state=self.app_state), axis=1
+            )
+        )
         return self
 
     def exchange(self) -> "SchwabActionsFromFile":
@@ -93,7 +99,7 @@ class SchwabActionsFromFile(list[SchwabAction]):
             df.index = pd.to_datetime(df.index)
             df.columns = [f"_{x}" if x[0].isdigit() else x for x in df.columns]
             df_list.append(df)
-        SchwabAction.EXCHANGE_RATES.update(
+        self.app_state.exchange_rates.update(
             pd.concat(df_list).sort_index().shift()["_1USD"].to_dict()
         )
 
