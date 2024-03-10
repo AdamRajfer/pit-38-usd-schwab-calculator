@@ -9,10 +9,12 @@ from pit38.stock import SchwabAction
 
 
 class SchwabActionsFromFile(list[SchwabAction]):
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self, path: str, app_state: Optional[AppState] = None
+    ) -> None:
         super().__init__()
         self.path = path
-        self.app_state = AppState()
+        self.app_state = app_state or AppState()
 
     def load(self) -> "SchwabActionsFromFile":
         df = pd.read_csv(self.path)

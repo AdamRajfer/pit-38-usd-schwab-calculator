@@ -6,21 +6,28 @@ import pandas as pd
 
 from pit38.income import IncomeSummary
 from pit38.preprocessing import SchwabActionsFromFile
+from pit38.state import AppState
 from pit38.stock import SchwabAction
 
 
 class SchwabActions(list[SchwabAction]):
     def __init__(
-        self, path: str, employment_date: Optional[datetime] = None
+        self,
+        path: str,
+        employment_date: Optional[datetime] = None,
+        app_state: Optional[AppState] = None,
     ) -> None:
         self.path = path
         self.employment_date = employment_date
+        self.app_state = app_state or AppState()
         self.summary: Dict[Hashable, IncomeSummary] = defaultdict(
             IncomeSummary
         )
 
     def prepare_summary(self) -> "SchwabActions":
-        for share in SchwabActionsFromFile(self.path).load().exchange():
+        for share in (
+            SchwabActionsFromFile(self.path, self.app_state).load().exchange()
+        ):
             if share.buying:
                 for _ in range(share.quantity):
                     self.append(share)
