@@ -68,12 +68,12 @@ class SchwabAction:
         self.purchase_price = (
             0.0
             if pd.isnull(self.PurchasePrice)
-            else self.PurchasePrice * self.app_state.exchange_rates[self.Date]
+            else self.PurchasePrice * self.app_state.exchange_rate(self.Date)
         )
         self.sale_price = (
             0.0
             if pd.isnull(self.SalePrice)
-            else self.SalePrice * self.app_state.exchange_rates[self.Date]
+            else self.SalePrice * self.app_state.exchange_rate(self.Date)
         )
         self.current_sale_price = self.app_state.stocks[self.Symbol] * next(
             reversed(self.app_state.exchange_rates.values())
