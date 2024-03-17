@@ -12,31 +12,33 @@ from pit38.state import AppState
 
 @dataclass
 class SchwabAction:
-    Date: datetime
-    Action: str
-    Symbol: str
-    Description: str
-    Quantity: float
-    FeesAndCommissions: float
-    Amount: float
-    Type: str
-    Shares: float
-    SalePrice: float
-    GrantId: str
-    VestDate: datetime
-    VestFairMarketValue: float
-    GrossProceeds: float
-    AwardDate: datetime
-    AwardId: str
-    FairMarketValuePrice: float
-    SharesSoldWithheldForTaxes: float
-    NetSharesDeposited: float
-    SubscriptionDate: datetime
-    SubscriptionFairMarketValue: float
-    PurchaseDate: datetime
-    PurchasePrice: float
-    PurchaseFairMarketValue: float
-    DispositionType: str
+    Date: datetime = pd.NaT
+    Action: str = ""
+    Symbol: str = ""
+    Description: str = ""
+    Quantity: float = np.nan
+    FeesAndCommissions: float = np.nan
+    DisbursementElection: str = ""
+    Amount: float = np.nan
+    Type: str = ""
+    Shares: float = np.nan
+    SalePrice: float = np.nan
+    SubscriptionDate: datetime = pd.NaT
+    SubscriptionFairMarketValue: float = np.nan
+    PurchaseDate: datetime = pd.NaT
+    PurchasePrice: float = np.nan
+    PurchaseFairMarketValue: float = np.nan
+    DispositionType: str = ""
+    GrantId: str = ""
+    VestDate: datetime = pd.NaT
+    VestFairMarketValue: float = np.nan
+    GrossProceeds: float = np.nan
+    AwardDate: datetime = pd.NaT
+    AwardId: str = ""
+    FairMarketValuePrice: float = np.nan
+    SharesSoldWithheldForTaxes: float = np.nan
+    NetSharesDeposited: float = np.nan
+    Taxes: float = np.nan
     app_state: Optional[AppState] = None
     year: int = field(init=False)
     quantity: int = field(init=False)

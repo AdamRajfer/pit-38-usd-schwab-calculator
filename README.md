@@ -11,4 +11,12 @@ docker-compose up
 cd ..
 ```
 
+For local development, run:
+
+```bash
+pip install poetry
+poetry install
+poetry run python app.py
+```
+
 ![demo](imgs/demo.jpg)
