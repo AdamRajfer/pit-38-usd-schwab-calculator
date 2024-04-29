@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+from itertools import chain
 from typing import Dict, Hashable, List, Optional
 
 import pandas as pd
@@ -10,13 +11,14 @@ from pit38.state import AppState
 from pit38.stock import SchwabAction
 
 
-class SchwabActions(list[SchwabAction]):
+class SchwabActions(defaultdict):
     def __init__(
         self,
         path: str,
         employment_date: Optional[datetime] = None,
         app_state: Optional[AppState] = None,
     ) -> None:
+        super().__init__(list)
         self.path = path
         self.employment_date = employment_date
         self.app_state = app_state or AppState()
@@ -30,12 +32,12 @@ class SchwabActions(list[SchwabAction]):
         ):
             if share.buying:
                 for _ in range(share.quantity):
-                    self.append(share)
+                    self[share.Description].append(share)
                 share.buy_msg()
             elif share.selling:
                 sold_shares: List[SchwabAction] = []
                 for _ in range(share.shares):
-                    sold_shares.append(self.pop(0))
+                    sold_shares.append(self[share.Type].pop(0))
                     self.summary[share.year] += IncomeSummary(
                         income=share.sale_price,
                         cost=sold_shares[-1].purchase_price,
@@ -49,7 +51,7 @@ class SchwabActions(list[SchwabAction]):
             else:
                 share.error_msg()
         self.summary["remaining"] = IncomeSummary()
-        for share in self:
+        for share in chain(*self.values()):
             self.summary["remaining"] += IncomeSummary(
                 income=share.current_sale_price,
                 cost=share.purchase_price,
