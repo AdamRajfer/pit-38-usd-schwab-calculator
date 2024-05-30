@@ -1,64 +1,41 @@
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, field
 from datetime import datetime
+from functools import partial
 from itertools import chain
 from typing import Any, Dict, List, Optional, Union
 
-import numpy as np
 import pandas as pd
 import yfinance as yf
 
-
-@dataclass
-class SchwabAction:
-    Date: datetime = pd.NaT
-    Action: str = ""
-    Symbol: str = ""
-    Description: str = ""
-    Quantity: float = np.nan
-    FeesAndCommissions: float = np.nan
-    DisbursementElection: str = ""
-    Amount: float = np.nan
-    Type: str = ""
-    Shares: float = np.nan
-    SalePrice: float = np.nan
-    SubscriptionDate: datetime = pd.NaT
-    SubscriptionFairMarketValue: float = np.nan
-    PurchaseDate: datetime = pd.NaT
-    PurchasePrice: float = np.nan
-    PurchaseFairMarketValue: float = np.nan
-    DispositionType: str = ""
-    GrantId: str = ""
-    VestDate: datetime = pd.NaT
-    VestFairMarketValue: float = np.nan
-    GrossProceeds: float = np.nan
-    AwardDate: datetime = pd.NaT
-    AwardId: str = ""
-    FairMarketValuePrice: float = np.nan
-    SharesSoldWithheldForTaxes: float = np.nan
-    NetSharesDeposited: float = np.nan
-    Taxes: float = np.nan
+from pit38.config import IncomeSummary, SchwabAction
 
 
-@dataclass
-class IncomeSummary:
-    income: float = 0.0
-    cost: float = 0.0
-    gross: float = field(init=False)
-    tax: float = field(init=False)
-    net: float = field(init=False)
+def _try_to_float(x: Any) -> Optional[float]:
+    try:
+        assert "," in x
+        return float(x.replace(",", "."))
+    except (AttributeError, ValueError, AssertionError, TypeError):
+        return None
 
-    def __post_init__(self) -> None:
-        self.gross = self.income - self.cost
-        self.tax = self.gross * 0.19
-        self.net = self.gross - self.tax
 
-    def __add__(self, other: "IncomeSummary") -> "IncomeSummary":
-        return IncomeSummary(
-            income=self.income + other.income,
-            cost=self.cost + other.cost,
-        )
+def _validate_purchase_price(schwab_action: SchwabAction) -> float:
+    if pd.notnull(schwab_action.PurchasePrice):
+        return schwab_action.PurchasePrice
+    return 0.0
+
+
+def _format_msg(schwab_action: SchwabAction, msg: str) -> str:
+    return f"[{schwab_action.Date.strftime('%Y-%m-%d')}] {schwab_action.Action} ({schwab_action.Description}): {msg}"
+
+
+def _get_exchange_rate(
+    date: datetime, exchange_rates: Dict[datetime, float]
+) -> float:
+    if date in exchange_rates:
+        return exchange_rates[date]
+    date = sorted(filter(lambda x: x < date, exchange_rates))[-1]
+    return exchange_rates[date]
 
 
 def load_schwab_actions(path: Any) -> List[SchwabAction]:
@@ -148,12 +125,9 @@ def load_summary(
     current_stock_values: Dict[str, float],
     exchange_rates: Dict[datetime, float],
 ) -> Dict[Union[int, str], IncomeSummary]:
-    def _get_exchange_rate(date_: datetime) -> float:
-        if date_ in exchange_rates:
-            return exchange_rates[date_]
-        date = sorted(filter(lambda x: x < date_, exchange_rates))[-1]
-        return exchange_rates[date]
-
+    get_exchange_rate_fn = partial(
+        _get_exchange_rate, exchange_rates=exchange_rates
+    )
     remaining_schwab_actions: Dict[str, List[SchwabAction]] = defaultdict(list)
     summary: Dict[Union[int, str], IncomeSummary] = defaultdict(IncomeSummary)
     for schwab_action in schwab_actions:
@@ -172,9 +146,9 @@ def load_summary(
                 )
                 summary[schwab_action.Date.year] += IncomeSummary(
                     income=schwab_action.SalePrice
-                    * _get_exchange_rate(schwab_action.Date),
+                    * get_exchange_rate_fn(schwab_action.Date),
                     cost=_validate_purchase_price(sold_schwab_actions[-1])
-                    * _get_exchange_rate(sold_schwab_actions[-1].Date),
+                    * get_exchange_rate_fn(sold_schwab_actions[-1].Date),
                 )
             msg = ""
             for sold_schwab_action in sold_schwab_actions:
@@ -201,7 +175,7 @@ def load_summary(
             income=current_stock_values[remaining_schwab_action.Symbol]
             * next(reversed(exchange_rates.values())),
             cost=_validate_purchase_price(remaining_schwab_action)
-            * _get_exchange_rate(remaining_schwab_action.Date),
+            * get_exchange_rate_fn(remaining_schwab_action.Date),
         )
     return summary
 
@@ -223,21 +197,3 @@ def format_summary(
         )
         .to_html()
     )
-
-
-def _try_to_float(x: Any) -> Optional[float]:
-    try:
-        assert "," in x
-        return float(x.replace(",", "."))
-    except (AttributeError, ValueError, AssertionError, TypeError):
-        return None
-
-
-def _validate_purchase_price(schwab_action: SchwabAction) -> float:
-    if pd.notnull(schwab_action.PurchasePrice):
-        return schwab_action.PurchasePrice
-    return 0.0
-
-
-def _format_msg(schwab_action: SchwabAction, msg: str) -> str:
-    return f"[{schwab_action.Date.strftime('%Y-%m-%d')}] {schwab_action.Action} ({schwab_action.Description}): {msg}"
