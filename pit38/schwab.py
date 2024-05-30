@@ -1,7 +1,6 @@
 import sys
 from collections import defaultdict
 from datetime import datetime
-from functools import partial
 from itertools import chain
 from typing import Any, Dict, List, Optional, Union
 
@@ -9,33 +8,7 @@ import pandas as pd
 import yfinance as yf
 
 from pit38.config import IncomeSummary, SchwabAction
-
-
-def _try_to_float(x: Any) -> Optional[float]:
-    try:
-        assert "," in x
-        return float(x.replace(",", "."))
-    except (AttributeError, ValueError, AssertionError, TypeError):
-        return None
-
-
-def _validate_purchase_price(schwab_action: SchwabAction) -> float:
-    if pd.notnull(schwab_action.PurchasePrice):
-        return schwab_action.PurchasePrice
-    return 0.0
-
-
-def _format_msg(schwab_action: SchwabAction, msg: str) -> str:
-    return f"[{schwab_action.Date.strftime('%Y-%m-%d')}] {schwab_action.Action} ({schwab_action.Description}): {msg}"
-
-
-def _get_exchange_rate(
-    date: datetime, exchange_rates: Dict[datetime, float]
-) -> float:
-    if date in exchange_rates:
-        return exchange_rates[date]
-    date = sorted(filter(lambda x: x < date, exchange_rates))[-1]
-    return exchange_rates[date]
+from pit38.utils import to_zero_if_null, try_to_cast_string_to_float
 
 
 def load_schwab_actions(path: Any) -> List[SchwabAction]:
@@ -108,7 +81,7 @@ def load_exchange_rates(min_year: int) -> Dict[datetime, float]:
                 skiprows=[1],
             )
             .set_index("data")
-            .map(_try_to_float)
+            .map(try_to_cast_string_to_float)
             .dropna(axis=1, how="all")
             .dropna(axis=0, how="all")
             .astype(float)
@@ -125,19 +98,26 @@ def load_summary(
     current_stock_values: Dict[str, float],
     exchange_rates: Dict[datetime, float],
 ) -> Dict[Union[int, str], IncomeSummary]:
-    get_exchange_rate_fn = partial(
-        _get_exchange_rate, exchange_rates=exchange_rates
-    )
+    def _get_exchange_rate(date_: datetime) -> float:
+        if date_ in exchange_rates:
+            return exchange_rates[date_]
+        date_ = sorted(filter(lambda x: x < date_, exchange_rates))[-1]
+        return exchange_rates[date_]
+
     remaining_schwab_actions: Dict[str, List[SchwabAction]] = defaultdict(list)
     summary: Dict[Union[int, str], IncomeSummary] = defaultdict(IncomeSummary)
     for schwab_action in schwab_actions:
+
+        def _format_msg(msg_: str) -> str:
+            return f"[{schwab_action.Date.strftime('%Y-%m-%d')}] {schwab_action.Action} ({schwab_action.Description}): {msg_}"
+
         if schwab_action.Action == "Deposit":
             for _ in range(int(schwab_action.Quantity)):
                 remaining_schwab_actions[schwab_action.Description].append(
                     schwab_action
                 )
-            msg = f"{schwab_action.Quantity} {schwab_action.Description} shares for {_validate_purchase_price(schwab_action) * schwab_action.Quantity:.2f} PLN."
-            print(_format_msg(schwab_action, msg))
+            msg = f"{schwab_action.Quantity} {schwab_action.Description} shares for {to_zero_if_null(schwab_action.PurchasePrice) * schwab_action.Quantity:.2f} PLN."
+            print(_format_msg(msg))
         elif schwab_action.Action == "Sale":
             sold_schwab_actions: List[SchwabAction] = []
             for _ in range(int(schwab_action.Shares)):
@@ -146,27 +126,27 @@ def load_summary(
                 )
                 summary[schwab_action.Date.year] += IncomeSummary(
                     income=schwab_action.SalePrice
-                    * get_exchange_rate_fn(schwab_action.Date),
-                    cost=_validate_purchase_price(sold_schwab_actions[-1])
-                    * get_exchange_rate_fn(sold_schwab_actions[-1].Date),
+                    * _get_exchange_rate(schwab_action.Date),
+                    cost=to_zero_if_null(sold_schwab_actions[-1].PurchasePrice)
+                    * _get_exchange_rate(sold_schwab_actions[-1].Date),
                 )
             msg = ""
             for sold_schwab_action in sold_schwab_actions:
-                msg += f"\n  -> 1 {schwab_action.Type} share for {schwab_action.SalePrice:.2f} PLN bought for {_validate_purchase_price(sold_schwab_action):.2f} PLN."
-            print(_format_msg(schwab_action, msg))
+                msg += f"\n  -> 1 {schwab_action.Type} share for {schwab_action.SalePrice:.2f} PLN bought for {to_zero_if_null(sold_schwab_action.PurchasePrice):.2f} PLN."
+            print(_format_msg(msg))
         elif schwab_action.Action == "Lapse":
             msg = f"{schwab_action.Quantity} shares."
-            print(_format_msg(schwab_action, msg))
+            print(_format_msg(msg))
         elif schwab_action.Action in [
             "Wire Transfer",
             "Tax Withholding",
             "Dividend",
         ]:
             msg = f"{schwab_action.Amount:.2f} USD."
-            print(_format_msg(schwab_action, msg))
+            print(_format_msg(msg))
         else:
             msg = f"Unknown action! The summary may not be adequate."
-            msg = _format_msg(schwab_action, msg)
+            msg = _format_msg(msg)
             print(msg)
             print(msg, file=sys.stderr)
     summary["remaining"] = IncomeSummary()
@@ -174,8 +154,8 @@ def load_summary(
         summary["remaining"] += IncomeSummary(
             income=current_stock_values[remaining_schwab_action.Symbol]
             * next(reversed(exchange_rates.values())),
-            cost=_validate_purchase_price(remaining_schwab_action)
-            * get_exchange_rate_fn(remaining_schwab_action.Date),
+            cost=to_zero_if_null(remaining_schwab_action.PurchasePrice)
+            * _get_exchange_rate(remaining_schwab_action.Date),
         )
     return summary
 
