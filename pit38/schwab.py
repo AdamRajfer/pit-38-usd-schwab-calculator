@@ -59,7 +59,7 @@ def load_schwab_actions(path: Any) -> List[SchwabAction]:
         )
         .astype(float)
     )
-    return list(df[::-1].apply(lambda x: SchwabAction(**x), axis=1))
+    return df[::-1].apply(lambda x: SchwabAction(**x), axis=1).tolist()
 
 
 def load_current_stock_values(symbols: List[str]) -> Dict[str, float]:
@@ -116,8 +116,11 @@ def load_summary(
                 remaining_schwab_actions[schwab_action.Description].append(
                     schwab_action
                 )
-            msg = f"{schwab_action.Quantity} {schwab_action.Description} shares for {to_zero_if_null(schwab_action.PurchasePrice) * schwab_action.Quantity:.2f} PLN."
-            print(_format_msg(msg))
+            print(
+                _format_msg(
+                    f"{schwab_action.Quantity} {schwab_action.Description} shares for {to_zero_if_null(schwab_action.PurchasePrice) * schwab_action.Quantity:.2f} PLN."
+                )
+            )
         elif schwab_action.Action == "Sale":
             sold_schwab_actions: List[SchwabAction] = []
             for _ in range(int(schwab_action.Shares)):
@@ -135,18 +138,17 @@ def load_summary(
                 msg += f"\n  -> 1 {schwab_action.Type} share for {schwab_action.SalePrice:.2f} PLN bought for {to_zero_if_null(sold_schwab_action.PurchasePrice):.2f} PLN."
             print(_format_msg(msg))
         elif schwab_action.Action == "Lapse":
-            msg = f"{schwab_action.Quantity} shares."
-            print(_format_msg(msg))
+            print(_format_msg(f"{schwab_action.Quantity} shares."))
         elif schwab_action.Action in [
             "Wire Transfer",
             "Tax Withholding",
             "Dividend",
         ]:
-            msg = f"{schwab_action.Amount:.2f} USD."
-            print(_format_msg(msg))
+            print(_format_msg(f"{schwab_action.Amount:.2f} USD."))
         else:
-            msg = f"Unknown action! The summary may not be adequate."
-            msg = _format_msg(msg)
+            msg = _format_msg(
+                "Unknown action! The summary may not be adequate."
+            )
             print(msg)
             print(msg, file=sys.stderr)
     summary["remaining"] = IncomeSummary()
