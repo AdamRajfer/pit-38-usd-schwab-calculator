@@ -5,6 +5,7 @@ from itertools import chain
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
+import requests
 import yfinance as yf
 
 from pit38.config import IncomeSummary, SchwabAction
@@ -152,10 +153,13 @@ def load_summary(
             print(msg)
             print(msg, file=sys.stderr)
     summary["remaining"] = IncomeSummary()
+    current_exchange_rate = requests.get(
+        "http://api.nbp.pl/api/exchangerates/rates/a/usd/?format=json"
+    ).json()["rates"][0]["mid"]
     for remaining_schwab_action in chain(*remaining_schwab_actions.values()):
         summary["remaining"] += IncomeSummary(
             income=current_stock_values[remaining_schwab_action.Symbol]
-            * next(reversed(exchange_rates.values())),
+            * current_exchange_rate,
             cost=to_zero_if_null(remaining_schwab_action.PurchasePrice)
             * _get_exchange_rate(remaining_schwab_action.Date),
         )
