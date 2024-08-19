@@ -118,7 +118,7 @@ def load_summary(
                 )
             print(
                 _format_msg(
-                    f"{schwab_action.Quantity} {schwab_action.Description} shares for {to_zero_if_null(schwab_action.PurchasePrice) * schwab_action.Quantity:.2f} PLN."
+                    f"{schwab_action.Quantity} {schwab_action.Description} shares for {to_zero_if_null(schwab_action.PurchasePrice) * schwab_action.Quantity:.2f} USD."
                 )
             )
         elif schwab_action.Action == "Sale":
@@ -135,7 +135,7 @@ def load_summary(
                 )
             msg = ""
             for sold_schwab_action in sold_schwab_actions:
-                msg += f"\n  -> 1 {schwab_action.Type} share for {schwab_action.SalePrice:.2f} PLN bought for {to_zero_if_null(sold_schwab_action.PurchasePrice):.2f} PLN."
+                msg += f"\n  -> 1 {schwab_action.Type} share for {schwab_action.SalePrice:.2f} USD bought for {to_zero_if_null(sold_schwab_action.PurchasePrice):.2f} USD."
             print(_format_msg(msg))
         elif schwab_action.Action == "Lapse":
             print(_format_msg(f"{schwab_action.Quantity} shares."))
