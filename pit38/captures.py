@@ -2,7 +2,6 @@ import sys
 from contextlib import AbstractContextManager
 from io import StringIO
 from traceback import format_exception
-from typing import Any
 
 from ansi2html import Ansi2HTMLConverter
 
@@ -15,7 +14,7 @@ class CaptureStdIntoHTML(AbstractContextManager):
         sys.stderr = StringIO()
         return self
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool:
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
         self.stdout_content = sys.stdout.getvalue()  # type: ignore
         self.stderr_content = sys.stderr.getvalue()  # type: ignore
         if exc_type:
