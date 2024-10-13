@@ -140,11 +140,19 @@ def load_summary(
             print(_format_msg(msg))
         elif schwab_action.Action == "Lapse":
             print(_format_msg(f"{schwab_action.Quantity} shares."))
-        elif schwab_action.Action in [
-            "Wire Transfer",
-            "Tax Withholding",
-            "Dividend",
-        ]:
+        elif schwab_action.Action == "Dividend":
+            summary[schwab_action.Date.year] += IncomeSummary(
+                dividend_gross=schwab_action.Amount
+                * _get_exchange_rate(schwab_action.Date),
+            )
+            print(_format_msg(f"{schwab_action.Amount:.2f} USD."))
+        elif schwab_action.Action == "Tax Withholding":
+            summary[schwab_action.Date.year] += IncomeSummary(
+                dividend_withholding_tax=-schwab_action.Amount
+                * _get_exchange_rate(schwab_action.Date),
+            )
+            print(_format_msg(f"{schwab_action.Amount:.2f} USD."))
+        elif schwab_action.Action == "Wire Transfer":
             print(_format_msg(f"{schwab_action.Amount:.2f} USD."))
         else:
             msg = _format_msg(
@@ -170,7 +178,10 @@ def format_summary(
     summary: Dict[Union[int, str], IncomeSummary],
     employment_date: Optional[datetime] = None,
 ) -> str:
-    df = pd.DataFrame({k: v.__dict__ for k, v in summary.items()})
+    df = pd.DataFrame({k: v.__dict__ for k, v in summary.items()}).loc[
+        list(IncomeSummary.__annotations__)
+    ]
+    df.index = df.index.str.replace("_", " ")
     df = df.assign(total=df.sum(axis=1))
     if employment_date is not None:
         months = (datetime.now() - employment_date).days / 30.4375
