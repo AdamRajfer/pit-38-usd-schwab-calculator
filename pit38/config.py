@@ -29,11 +29,25 @@ class SchwabAction:
     VestFairMarketValue: float = np.nan
     GrossProceeds: float = np.nan
     AwardDate: datetime = pd.NaT
-    AwardId: str = ""
+    AwardId: float = np.nan
     FairMarketValuePrice: float = np.nan
     SharesSoldWithheldForTaxes: float = np.nan
     NetSharesDeposited: float = np.nan
     Taxes: float = np.nan
+
+    def __post_init__(self) -> None:
+        if not np.isnan(self.Quantity):
+            self.Quantity = int(self.Quantity)
+        if not np.isnan(self.Shares):
+            self.Shares = int(self.Shares)
+        if not np.isnan(self.AwardId):
+            self.AwardId = int(self.AwardId)
+        if not np.isnan(self.SharesSoldWithheldForTaxes):
+            self.SharesSoldWithheldForTaxes = int(
+                self.SharesSoldWithheldForTaxes
+            )
+        if not np.isnan(self.NetSharesDeposited):
+            self.NetSharesDeposited = int(self.NetSharesDeposited)
 
 
 @dataclass
