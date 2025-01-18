@@ -4,12 +4,10 @@
         "host"
     ],
     "mounts": [
-        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached,readonly",
         "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind,consistency=cached"
     ],
     "workspaceFolder": "${localWorkspaceFolder}",
-    "privileged": true,
     "initializeCommand": "bash .devcontainer/startup.sh",
-    "onCreateCommand": "pip install poetry && poetry install",
+    "onCreateCommand": "pip install pre-commit poetry && pre-commit install && poetry install",
     "image": "python:3---devcontainer"
 }
