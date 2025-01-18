@@ -19,7 +19,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
-line_length = 79
+line-length = 79
 
 [tool.isort]
 line_length = 79
@@ -30,6 +30,7 @@ use_parentheses = true
 
 [tool.mypy]
 ignore_missing_imports = true
+explicit_package_bases = true
 
 [tool.autoflake]
 remove_all_unused_imports = true
