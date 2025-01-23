@@ -59,6 +59,7 @@ class IncomeSummary:
     dividend_gross: float = 0.0
     dividend_withholding_tax: float = 0.0
     dividend_remaining_tax: float = field(init=False)
+    fees: float = 0.0
     net: float = field(init=False)
 
     def __post_init__(self) -> None:
@@ -73,6 +74,7 @@ class IncomeSummary:
             - self.tax
             - self.dividend_withholding_tax
             - self.dividend_remaining_tax
+            - self.fees
         )
 
     def __add__(self, other: "IncomeSummary") -> "IncomeSummary":
@@ -82,4 +84,5 @@ class IncomeSummary:
             dividend_gross=self.dividend_gross + other.dividend_gross,
             dividend_withholding_tax=self.dividend_withholding_tax
             + other.dividend_withholding_tax,
+            fees=self.fees + other.fees,
         )

@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import datetime
 from itertools import chain
 
+import numpy as np
 import pandas as pd
 
 from pit38.config import IncomeSummary, SchwabAction
@@ -89,6 +90,12 @@ def summarize_schwab_actions(
 
         def _format_msg(msg_: str) -> str:
             return f"[{schwab_action.Date.strftime('%Y-%m-%d')}] {schwab_action.Action} ({schwab_action.Description}): {msg_}"
+
+        if pd.notnull(schwab_action.FeesAndCommissions):
+            summary[schwab_action.Date.year] += IncomeSummary(
+                fees=np.abs(schwab_action.FeesAndCommissions)
+                * _get_usd_pln_exchange_rate(schwab_action.Date)
+            )
 
         if schwab_action.Action == "Deposit":
             for _ in range(int(schwab_action.Quantity)):
