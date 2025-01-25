@@ -3,7 +3,6 @@ from collections import defaultdict
 from datetime import datetime
 from itertools import chain
 
-import numpy as np
 import pandas as pd
 
 from pit38.config import IncomeSummary, SchwabAction
@@ -91,12 +90,6 @@ def summarize_schwab_actions(
         def _format_msg(msg_: str) -> str:
             return f"[{schwab_action.Date.strftime('%Y-%m-%d')}] {schwab_action.Action} ({schwab_action.Description}): {msg_}"
 
-        if pd.notnull(schwab_action.FeesAndCommissions):
-            summary[schwab_action.Date.year] += IncomeSummary(
-                fees=np.abs(schwab_action.FeesAndCommissions)
-                * _get_usd_pln_exchange_rate(schwab_action.Date)
-            )
-
         if schwab_action.Action == "Deposit":
             for _ in range(int(schwab_action.Quantity)):
                 remaining_schwab_actions[schwab_action.Description].append(
@@ -108,6 +101,10 @@ def summarize_schwab_actions(
                 )
             )
         elif schwab_action.Action == "Sale":
+            summary[schwab_action.Date.year] += IncomeSummary(
+                fees=_to_zero_if_null(schwab_action.FeesAndCommissions)
+                * _get_usd_pln_exchange_rate(schwab_action.Date)
+            )
             sold_schwab_actions: list[SchwabAction] = []
             for _ in range(int(schwab_action.Shares)):
                 sold_schwab_actions.append(
@@ -140,6 +137,10 @@ def summarize_schwab_actions(
             )
             print(_format_msg(f"{schwab_action.Amount:.2f} USD."))
         elif schwab_action.Action == "Wire Transfer":
+            summary[schwab_action.Date.year] += IncomeSummary(
+                fees=-_to_zero_if_null(schwab_action.FeesAndCommissions)
+                * _get_usd_pln_exchange_rate(schwab_action.Date)
+            )
             print(_format_msg(f"{schwab_action.Amount:.2f} USD."))
         else:
             msg = _format_msg(
