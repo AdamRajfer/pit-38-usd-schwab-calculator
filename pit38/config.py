@@ -35,6 +35,8 @@ class SchwabAction:
     NetSharesDeposited: float = np.nan
     Taxes: float = np.nan
     CarryForward: float = np.nan
+    TaxWithholdingMethod: str | float = np.nan
+    SharesWithheld: float = np.nan
 
     def __post_init__(self) -> None:
         if not np.isnan(self.Quantity):
