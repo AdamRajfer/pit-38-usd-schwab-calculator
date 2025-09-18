@@ -12,10 +12,10 @@ from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 @dataclass(frozen=True)
 class IBTradeCashTaxReporter(TaxReporter):
     report_paths: list[Path]
+    min_year: int
 
     def generate(self) -> TaxReport:
-        min_year = 2022
-        exc_rates = fetch_exchange_rates(min_year)
+        exc_rates = fetch_exchange_rates(self.min_year)
         trades = self._load_trades(exc_rates)
         dividends = self._load_dividends_or_interests(
             prefix="Dividends",
@@ -31,7 +31,7 @@ class IBTradeCashTaxReporter(TaxReporter):
         )
 
         tax_report = TaxReport()
-        for year in range(min_year, datetime.now().year + 1):
+        for year in range(self.min_year, datetime.now().year + 1):
             revenue = 0.0
             cost = 0.0
             interest = 0.0
