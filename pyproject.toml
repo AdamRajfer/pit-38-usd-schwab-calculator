@@ -1,18 +1,18 @@
 [tool.poetry]
-name = "pit-38-usd-schwab-calculator"
-version = "0.1.0"
-description = "Tool for summarizing taxes for PIT-38 given a Charles Schwab CSV file with full history of USD transactions."
+name = "polish-pit-calculator"
+version = "1.0.0"
+description = "Tool for generating content for Polish PIT forms."
 authors = ["Adam Rajfer <adam.rajfer@gmail.com>"]
 packages = [
-    { include = "pit38" }
+    { include = "polish_pit_calculator" }
 ]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-ansi2html = "*"
-flask = "*"
+jsonargparse = "*"
 pandas = "*"
-yfinance = "*"
+scipy = "*"
+tabulate = "*"
 
 [build-system]
 requires = ["poetry-core"]
