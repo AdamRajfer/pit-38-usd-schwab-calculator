@@ -31,22 +31,22 @@ print(tax_report.to_string())
 It will generate the following report (filled with the calculated content):
 
 ```bash
-|                                                                 |   2022 |   2023 |   2024 |   2025 |
-|-----------------------------------------------------------------|--------|--------|--------|--------|
-| Trade Revenue (PIT-38/C20)                                      |   0.00 |   0.00 |   0.00 |   0.00 |
-| Trade Cost (PIT-38/C21)                                         |   0.00 |   0.00 |   0.00 |   0.00 |
-| Trade Loss from Previous Years (PIT-38/D28)                     |   0.00 |   0.00 |   0.00 |   0.00 |
-| Trade Loss (PIT-38/D28 - Next Year)                             |   0.00 |   0.00 |   0.00 |   0.00 |
-| Crypto Revenue (PIT-38/E34)                                     |   0.00 |   0.00 |   0.00 |   0.00 |
-| Crypto Cost (PIT-38/E35)                                        |   0.00 |   0.00 |   0.00 |   0.00 |
-| Crypto Cost Excess from Previous Years (PIT-38/E36)             |   0.00 |   0.00 |   0.00 |   0.00 |
-| Crypto Cost Excess (PIT-38/E36 - Next Year)                     |   0.00 |   0.00 |   0.00 |   0.00 |
-| Domestic Interest Tax (PIT-38/G44)                              |   0.00 |   0.00 |   0.00 |   0.00 |
-| Foreign Interest Tax (PIT-38/G45)                               |   0.22 |   0.00 |   0.00 |   0.00 |
-| Foreign Interest Withholding Tax (PIT-38/G46)                   |   0.19 |   0.00 |   0.00 |   0.00 |
-| Employment Profit Deduction (PIT/O/B11 -> PIT-37/F124)          |   0.00 |   0.00 |   0.00 |   0.00 |
-| Total Profit (DSF-1/C18 - If Solidarity Tax > 0.00)             |   0.00 |   0.00 |   0.00 |   0.00 |
-| Total Profit Deductions (DSF-1/CC19 - If Solidarity Tax > 0.00) |   0.00 |   0.00 |   0.00 |   0.00 |
-| Solidarity Tax                                                  |   0.00 |   0.00 |   0.00 |   0.00 |
-| Total Tax                                                       |   0.03 |   0.00 |   0.00 |   0.00 |
+|                                                                |   2022 |   2023 |   2024 |   2025 |
+|----------------------------------------------------------------|--------|--------|--------|--------|
+| Trade Revenue (PIT-38/C20)                                     |   0.00 |   0.00 |   0.00 |   0.00 |
+| Trade Cost (PIT-38/C21)                                        |   0.00 |   0.00 |   0.00 |   0.00 |
+| Trade Loss from Previous Years (PIT-38/D28)                    |   0.00 |   0.00 |   0.00 |   0.00 |
+| Trade Loss (PIT-38/D28 - Next Year)                            |   0.00 |   0.00 |   0.00 |   0.00 |
+| Crypto Revenue (PIT-38/E34)                                    |   0.00 |   0.00 |   0.00 |   0.00 |
+| Crypto Cost (PIT-38/E35)                                       |   0.00 |   0.00 |   0.00 |   0.00 |
+| Crypto Cost Excess from Previous Years (PIT-38/E36)            |   0.00 |   0.00 |   0.00 |   0.00 |
+| Crypto Cost Excess (PIT-38/E36 - Next Year)                    |   0.00 |   0.00 |   0.00 |   0.00 |
+| Domestic Interest Tax (PIT-38/G44)                             |   0.00 |   0.00 |   0.00 |   0.00 |
+| Foreign Interest Tax (PIT-38/G45)                              |   0.22 |   0.00 |   0.00 |   0.00 |
+| Foreign Interest Withholding Tax (PIT-38/G46)                  |   0.19 |   0.00 |   0.00 |   0.00 |
+| Employment Profit Deduction (PIT/O/B11 -> PIT-37/F124)         |   0.00 |   0.00 |   0.00 |   0.00 |
+| Total Profit (DSF-1/C18 - If Solidarity Tax > 0.00)            |   0.00 |   0.00 |   0.00 |   0.00 |
+| Total Profit Deductions (DSF-1/C19 - If Solidarity Tax > 0.00) |   0.00 |   0.00 |   0.00 |   0.00 |
+| Solidarity Tax                                                 |   0.00 |   0.00 |   0.00 |   0.00 |
+| Total Tax                                                      |   0.03 |   0.00 |   0.00 |   0.00 |
 ```

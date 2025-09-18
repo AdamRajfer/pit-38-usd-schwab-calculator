@@ -132,7 +132,7 @@ class TaxRecord:
             "Foreign Interest Withholding Tax (PIT-38/G46)": self.foreign_interest_withholding_tax,
             "Employment Profit Deduction (PIT/O/B11 -> PIT-37/F124)": self.employment_profit_deduction,
             "Total Profit (DSF-1/C18 - If Solidarity Tax > 0.00)": self.total_profit,
-            "Total Profit Deductions (DSF-1/CC19 - If Solidarity Tax > 0.00)": self.total_profit_deductions,
+            "Total Profit Deductions (DSF-1/C19 - If Solidarity Tax > 0.00)": self.total_profit_deductions,
             "Solidarity Tax": self.solidarity_tax,
             "Total Tax": self.total_tax,
         }
