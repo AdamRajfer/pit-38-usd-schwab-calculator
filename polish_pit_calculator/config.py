@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import pandas as pd
 from tabulate import tabulate
@@ -205,9 +204,3 @@ class SavingsConfig:
 class TaxSummaryConfig:
     tax_reporters: list[TaxReporter]
     savings: SavingsConfig
-
-
-@dataclass(frozen=True)
-class DashboardConfig:
-    data_dir: Path
-    properties: dict[str, dict[str, dict[str, str]]]
