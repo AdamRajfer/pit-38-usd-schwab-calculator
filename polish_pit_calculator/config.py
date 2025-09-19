@@ -192,15 +192,3 @@ class TaxReporter(ABC):
     @abstractmethod
     def generate(self) -> TaxReport:
         pass
-
-
-@dataclass(frozen=True)
-class SavingsConfig:
-    cash: float
-    interest_rate: float
-
-
-@dataclass(frozen=True)
-class TaxSummaryConfig:
-    tax_reporters: list[TaxReporter]
-    savings: SavingsConfig

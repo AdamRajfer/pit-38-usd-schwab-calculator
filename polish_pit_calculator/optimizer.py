@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 from scipy.optimize import minimize
 
-from polish_pit_calculator.config import SavingsConfig, TaxReport
+from polish_pit_calculator.config import TaxReport
 
 
 class SavingsForTaxOptimizer:
@@ -28,7 +28,8 @@ class SavingsForTaxOptimizer:
     def fit(
         self,
         tax_report: TaxReport,
-        savings: SavingsConfig,
+        savings: float,
+        interest_rate: float,
     ) -> "SavingsForTaxOptimizer":
         taxes: dict[date, float] = defaultdict(lambda: 0.0)
         for year, tax_record in tax_report.items():
@@ -40,19 +41,19 @@ class SavingsForTaxOptimizer:
         ] = 0.0
         fun = partial(
             self._estimate_future_abs_savings,
-            interest_rate=savings.interest_rate,
+            interest_rate=interest_rate,
             taxes=taxes,
         )
-        res = minimize(fun=fun, x0=savings.cash, method="Nelder-Mead")
+        res = minimize(fun=fun, x0=savings, method="Nelder-Mead")
         required_cash = res.x[0]
         final_cash = self._estimate_future_abs_savings(
             initial_savings=required_cash,
             taxes=taxes,
-            interest_rate=savings.interest_rate,
+            interest_rate=interest_rate,
         )
         assert np.isclose(final_cash, 0.0, atol=self.tolerance)
-        msg = f"Current savings: {savings.cash:,.2f} PLN. Required savings: {required_cash:,.2f} PLN."
-        if (diff := required_cash - savings.cash) < -5e-3:
+        msg = f"Current savings: {savings:,.2f} PLN. Required savings: {required_cash:,.2f} PLN."
+        if (diff := required_cash - savings) < -5e-3:
             msg = f"{msg} Decrease savings by:\t{np.abs(diff):,.2f} PLN."
         elif diff > 5e-3:
             msg = f"{msg} Increase savings by:\t{diff:,.2f} PLN."
