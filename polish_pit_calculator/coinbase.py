@@ -1,16 +1,17 @@
 from dataclasses import dataclass
-from pathlib import Path
 
 import pandas as pd
 
-from polish_pit_calculator.config import TaxRecord, TaxReport, TaxReporter
+from polish_pit_calculator.config import (
+    FilesBasedTaxReporter,
+    TaxRecord,
+    TaxReport,
+)
 from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 
 
 @dataclass(frozen=True)
-class CoinbaseTaxReporter(TaxReporter):
-    report_paths: list[Path]
-
+class CoinbaseTaxReporter(FilesBasedTaxReporter):
     def generate(self) -> TaxReport:
         df = self._load_report()
         tax_report = TaxReport()

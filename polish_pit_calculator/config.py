@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pandas as pd
 from tabulate import tabulate
@@ -192,3 +193,8 @@ class TaxReporter(ABC):
     @abstractmethod
     def generate(self) -> TaxReport:
         pass
+
+
+@dataclass(frozen=True)
+class FilesBasedTaxReporter(TaxReporter):
+    report_paths: list[Path]

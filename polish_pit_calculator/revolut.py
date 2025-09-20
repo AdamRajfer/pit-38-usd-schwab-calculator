@@ -1,15 +1,16 @@
 from dataclasses import dataclass
-from pathlib import Path
 
 import pandas as pd
 
-from polish_pit_calculator.config import TaxRecord, TaxReport, TaxReporter
+from polish_pit_calculator.config import (
+    FilesBasedTaxReporter,
+    TaxRecord,
+    TaxReport,
+)
 
 
 @dataclass(frozen=True)
-class RevolutInterestTaxReporter(TaxReporter):
-    report_paths: list[Path]
-
+class RevolutInterestTaxReporter(FilesBasedTaxReporter):
     def generate(self) -> TaxReport:
         df = self._load_report()
         tax_report = TaxReport()
