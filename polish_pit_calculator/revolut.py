@@ -8,7 +8,7 @@ from polish_pit_calculator.config import TaxRecord, TaxReport, TaxReporter
 
 @dataclass(frozen=True)
 class RevolutInterestTaxReporter(TaxReporter):
-    report_path: Path
+    report_paths: list[Path]
 
     def generate(self) -> TaxReport:
         df = self._load_report()
@@ -20,7 +20,11 @@ class RevolutInterestTaxReporter(TaxReporter):
         return tax_report
 
     def _load_report(self) -> pd.DataFrame:
-        df = pd.read_csv(self.report_path)
+        reports = []
+        for path in self.report_paths:
+            report = pd.read_csv(path)
+            reports.append(report)
+        df = pd.concat(reports, ignore_index=True)
         df = df[df["Description"].str.startswith("Gross interest")]
         df["Completed Date"] = pd.to_datetime(
             df["Completed Date"], dayfirst=True

@@ -9,7 +9,7 @@ from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 
 @dataclass(frozen=True)
 class CoinbaseTaxReporter(TaxReporter):
-    report_path: Path
+    report_paths: list[Path]
 
     def generate(self) -> TaxReport:
         df = self._load_report()
@@ -22,9 +22,11 @@ class CoinbaseTaxReporter(TaxReporter):
         return tax_report
 
     def _load_report(self) -> pd.DataFrame:
-        df = pd.read_csv(
-            self.report_path, skiprows=3, parse_dates=["Timestamp"]
-        )
+        reports = []
+        for path in self.report_paths:
+            report = pd.read_csv(path, skiprows=3, parse_dates=["Timestamp"])
+            reports.append(report)
+        df = pd.concat(reports, ignore_index=True)
         df["Timestamp"] = df["Timestamp"].dt.date
         df["Year"] = df["Timestamp"].apply(lambda x: x.year)
         df = df[
