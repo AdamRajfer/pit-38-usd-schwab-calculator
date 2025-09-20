@@ -92,13 +92,13 @@ class IBTradeCashTaxReporter(TaxReporter):
                 buy = x_buy.iloc[buy_idx]
                 buy_exchange_rate = get_exchange_rate(
                     buy["Currency"],
-                    buy["Date/Time"],
+                    buy["Date/Time"].date(),
                     exc_rates,
                 )
                 sell = x_sell.iloc[sell_idx]
                 sell_exchange_rate = get_exchange_rate(
                     sell["Currency"],
-                    sell["Date/Time"],
+                    sell["Date/Time"].date(),
                     exc_rates,
                 )
                 if buy["Quantity"] == sell["Quantity"]:
@@ -155,7 +155,9 @@ class IBTradeCashTaxReporter(TaxReporter):
         exc_rates: dict[str, dict[date, float]],
     ) -> pd.DataFrame:
         df = self._load_report(prefix, "Date", pattern)
+        df["Date"] = df["Date"].dt.date
         wtax = self._load_report("Withholding Tax", "Date", wtax_pattern)
+        wtax["Date"] = wtax["Date"].dt.date
         df = df[["Currency", "Date", "Description", "Amount"]].merge(
             wtax,
             on=["Currency", "Description"],
@@ -186,7 +188,6 @@ class IBTradeCashTaxReporter(TaxReporter):
                 reports.append(report)
         df = pd.concat(reports, ignore_index=True)
         df = df[df[date_col].notna()]
-        df[date_col] = df[date_col].dt.date
         df["Year"] = df[date_col].apply(lambda x: x.year)
         if regex is not None:
             df["Description"] = df["Description"].str.replace(

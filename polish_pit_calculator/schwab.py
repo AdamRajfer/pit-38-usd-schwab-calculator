@@ -10,8 +10,7 @@ from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 
 @dataclass(frozen=True)
 class SchwabEmployeeSponsoredTaxReporter(TaxReporter):
-    report_path: Path
-    cached_report_path: Path | None = None
+    report_paths: list[Path]
 
     def generate(self) -> TaxReport:
         df = self._load_report()
@@ -63,27 +62,23 @@ class SchwabEmployeeSponsoredTaxReporter(TaxReporter):
         return tax_report
 
     def _load_report(self) -> pd.DataFrame:
-        if (
-            self.cached_report_path is not None
-            and self.cached_report_path.exists()
-        ):
-            df = pd.read_csv(self.report_path)
-            cache = pd.read_csv(self.cached_report_path)
-            pd.testing.assert_index_equal(
-                df.columns, cache.columns, check_order=False
-            )
-            cache = cache[df.columns]
-            common_idx = (
-                (df.fillna("NaN") == cache.fillna("NaN").iloc[0])
-                .all(axis=1)
-                .idxmax()
-            )
-            update = df.iloc[:common_idx]
-            df = pd.concat([update, cache], ignore_index=True).astype(
-                {"Shares": "Int64", "Quantity": "Int64", "GrantId": "Int64"}
-            )
-        else:
-            df = pd.read_csv(self.report_path)
+        reports: list[pd.DataFrame] = []
+        for path in self.report_paths:
+            report = pd.read_csv(path)
+            if reports:
+                pd.testing.assert_index_equal(
+                    report.columns, reports[-1].columns, check_order=False
+                )
+                max_current_date = pd.to_datetime(report["Date"]).max()
+                min_previous_date = pd.to_datetime(reports[-1]["Date"]).min()
+                assert (
+                    max_current_date < min_previous_date
+                ), f"Reports must be in reverse chronological order ({max_current_date} is not earlier than {min_previous_date})"
+                report = report[reports[-1].columns]
+            reports.append(report)
+        df = pd.concat(reports, ignore_index=True).astype(
+            {"Shares": "Int64", "Quantity": "Int64", "GrantId": "Int64"}
+        )
         df["Date"] = pd.to_datetime(df["Date"])
         df_notnull = df[df["Date"].notna()].dropna(axis=1, how="all")
         curr = 0
