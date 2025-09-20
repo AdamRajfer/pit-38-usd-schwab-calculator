@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
 
@@ -12,26 +12,25 @@ from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 @dataclass(frozen=True)
 class IBTradeCashTaxReporter(TaxReporter):
     report_paths: list[Path]
-    min_year: int
 
     def generate(self) -> TaxReport:
-        exc_rates = fetch_exchange_rates(self.min_year)
-        trades = self._load_trades(exc_rates)
+        trades = self._load_trades()
         dividends = self._load_dividends_or_interests(
             prefix="Dividends",
             pattern=r"\s*\([^()]*\)\s*$",
             wtax_pattern=r"\s-\s?.*$",
-            exc_rates=exc_rates,
         )
         interests = self._load_dividends_or_interests(
             prefix="Interest",
             pattern=r"^[A-Z]+\s+",
             wtax_pattern=r"^.*?\bon\b\s*",
-            exc_rates=exc_rates,
+        )
+        min_year = int(
+            min(df["Year"].min() for df in [trades, dividends, interests])
         )
 
         tax_report = TaxReport()
-        for year in range(self.min_year, datetime.now().year + 1):
+        for year in range(min_year, datetime.now().year + 1):
             revenue = 0.0
             cost = 0.0
             interest = 0.0
@@ -63,9 +62,7 @@ class IBTradeCashTaxReporter(TaxReporter):
 
         return tax_report
 
-    def _load_trades(
-        self, exc_rates: dict[str, dict[date, float]]
-    ) -> pd.DataFrame:
+    def _load_trades(self) -> pd.DataFrame:
         df = self._load_report("Trades", "Date/Time")
         df = (
             df[df["Header"] == "Data"]
@@ -80,6 +77,8 @@ class IBTradeCashTaxReporter(TaxReporter):
         df["Type"] = df["Quantity"].apply(lambda x: "BUY" if x > 0 else "SELL")
         df["Price"] = (df["Proceeds"] + df["Comm/Fee"]) / -df["Quantity"]
         df["Quantity"] = df["Quantity"].abs()
+        min_year = df["Date/Time"].dt.date.min().year
+        exc_rates = fetch_exchange_rates(min_year)
         trades = []
         for _, x in df.groupby("Symbol"):
             x = x.sort_values("Date/Time")
@@ -152,7 +151,6 @@ class IBTradeCashTaxReporter(TaxReporter):
         prefix: str,
         pattern: str,
         wtax_pattern: str,
-        exc_rates: dict[str, dict[date, float]],
     ) -> pd.DataFrame:
         df = self._load_report(prefix, "Date", pattern)
         df["Date"] = df["Date"].dt.date
@@ -164,8 +162,10 @@ class IBTradeCashTaxReporter(TaxReporter):
             how="left",
             suffixes=("", "_wtax"),
         )
-        df = df.fillna(0.0)
+        df = df.fillna({"Amount": 0.0, "Amount_wtax": 0.0})
         df["Amount_wtax"] = df["Amount_wtax"].abs()
+        min_year = int(min(df["Year"].min(), wtax["Year"].min()))
+        exc_rates = fetch_exchange_rates(min_year)
         exc_rate = df.apply(
             lambda x: get_exchange_rate(x["Currency"], x["Date"], exc_rates),
             axis=1,
