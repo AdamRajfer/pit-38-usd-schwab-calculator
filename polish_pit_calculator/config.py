@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import Any
 
 import pandas as pd
-from tabulate import tabulate
 
 
 @dataclass(frozen=True)
@@ -179,22 +178,11 @@ class TaxReport:
             orient="index",
         ).T.sort_index(axis=1)
 
-    def to_string(self) -> str:
-        return tabulate(
-            self.to_dataframe(),
-            headers="keys",
-            tablefmt="github",
-            floatfmt=",.2f",
-        )
 
-
-@dataclass(frozen=True)
 class TaxReporter(ABC):
+    def __init__(self, *args: Any) -> None:
+        self.args = args
+
     @abstractmethod
     def generate(self) -> TaxReport:
         pass
-
-
-@dataclass(frozen=True)
-class FilesBasedTaxReporter(TaxReporter):
-    report_paths: list[Path]

@@ -1,18 +1,12 @@
 from collections import defaultdict
-from dataclasses import dataclass
 
 import pandas as pd
 
-from polish_pit_calculator.config import (
-    FilesBasedTaxReporter,
-    TaxRecord,
-    TaxReport,
-)
+from polish_pit_calculator.config import TaxRecord, TaxReport, TaxReporter
 from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 
 
-@dataclass(frozen=True)
-class SchwabEmployeeSponsoredTaxReporter(FilesBasedTaxReporter):
+class SchwabEmployeeSponsoredTaxReporter(TaxReporter):
     def generate(self) -> TaxReport:
         df = self._load_report()
         min_year = df["Date"].apply(lambda x: x.year).min()
@@ -64,19 +58,19 @@ class SchwabEmployeeSponsoredTaxReporter(FilesBasedTaxReporter):
 
     def _load_report(self) -> pd.DataFrame:
         reports: list[pd.DataFrame] = []
-        for path in self.report_paths:
-            report = pd.read_csv(path)
+        for arg in self.args:
+            report = pd.read_csv(arg)
             if reports:
                 pd.testing.assert_index_equal(
                     report.columns, reports[-1].columns, check_order=False
                 )
-                max_current_date = pd.to_datetime(report["Date"]).max()
-                min_previous_date = pd.to_datetime(reports[-1]["Date"]).min()
-                assert (
-                    max_current_date < min_previous_date
-                ), f"Reports must be in reverse chronological order ({max_current_date} is not earlier than {min_previous_date})"
                 report = report[reports[-1].columns]
             reports.append(report)
+        reports = sorted(
+            reports,
+            key=lambda x: pd.to_datetime(x["Date"]).max(),
+            reverse=True,
+        )
         df = pd.concat(reports, ignore_index=True).astype(
             {"Shares": "Int64", "Quantity": "Int64", "GrantId": "Int64"}
         )

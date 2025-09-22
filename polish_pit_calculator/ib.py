@@ -1,19 +1,13 @@
-from dataclasses import dataclass
 from datetime import datetime
 from io import StringIO
 
 import pandas as pd
 
-from polish_pit_calculator.config import (
-    FilesBasedTaxReporter,
-    TaxRecord,
-    TaxReport,
-)
+from polish_pit_calculator.config import TaxRecord, TaxReport, TaxReporter
 from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 
 
-@dataclass(frozen=True)
-class IBTradeCashTaxReporter(FilesBasedTaxReporter):
+class IBTradeCashTaxReporter(TaxReporter):
     def generate(self) -> TaxReport:
         trades = self._load_trades()
         dividends = self._load_dividends_or_interests(
@@ -179,14 +173,18 @@ class IBTradeCashTaxReporter(FilesBasedTaxReporter):
         self, prefix: str, date_col: str, regex: str | None = None
     ) -> pd.DataFrame:
         reports: list[pd.DataFrame] = []
-        for path in self.report_paths:
-            with path.open("r") as f:
-                io = "".join(x for x in f if x.startswith(f"{prefix},"))
-                if not io:
-                    continue
-                string_io = StringIO(io)
-                report = pd.read_csv(string_io, parse_dates=[date_col])
-                reports.append(report)
+        for arg in self.args:
+            content = arg.getvalue().decode("utf-8")
+            io = "".join(
+                x
+                for x in content.splitlines(True)
+                if x.startswith(f"{prefix},")
+            )
+            if not io:
+                continue
+            string_io = StringIO(io)
+            report = pd.read_csv(string_io, parse_dates=[date_col])
+            reports.append(report)
         df = pd.concat(reports, ignore_index=True)
         df = df[df[date_col].notna()]
         df["Year"] = df[date_col].apply(lambda x: x.year)

@@ -9,10 +9,9 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-jsonargparse = "*"
 pandas = "*"
 scipy = "*"
-tabulate = "*"
+streamlit = "*"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,17 +1,10 @@
-from dataclasses import dataclass
-
 import pandas as pd
 
-from polish_pit_calculator.config import (
-    FilesBasedTaxReporter,
-    TaxRecord,
-    TaxReport,
-)
+from polish_pit_calculator.config import TaxRecord, TaxReport, TaxReporter
 from polish_pit_calculator.utils import fetch_exchange_rates, get_exchange_rate
 
 
-@dataclass(frozen=True)
-class CoinbaseTaxReporter(FilesBasedTaxReporter):
+class CoinbaseTaxReporter(TaxReporter):
     def generate(self) -> TaxReport:
         df = self._load_report()
         tax_report = TaxReport()
@@ -24,8 +17,8 @@ class CoinbaseTaxReporter(FilesBasedTaxReporter):
 
     def _load_report(self) -> pd.DataFrame:
         reports = []
-        for path in self.report_paths:
-            report = pd.read_csv(path, skiprows=3, parse_dates=["Timestamp"])
+        for arg in self.args:
+            report = pd.read_csv(arg, skiprows=3, parse_dates=["Timestamp"])
             reports.append(report)
         df = pd.concat(reports, ignore_index=True)
         df["Timestamp"] = df["Timestamp"].dt.date

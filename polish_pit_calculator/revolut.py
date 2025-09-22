@@ -1,16 +1,9 @@
-from dataclasses import dataclass
-
 import pandas as pd
 
-from polish_pit_calculator.config import (
-    FilesBasedTaxReporter,
-    TaxRecord,
-    TaxReport,
-)
+from polish_pit_calculator.config import TaxRecord, TaxReport, TaxReporter
 
 
-@dataclass(frozen=True)
-class RevolutInterestTaxReporter(FilesBasedTaxReporter):
+class RevolutInterestTaxReporter(TaxReporter):
     def generate(self) -> TaxReport:
         df = self._load_report()
         tax_report = TaxReport()
@@ -22,8 +15,8 @@ class RevolutInterestTaxReporter(FilesBasedTaxReporter):
 
     def _load_report(self) -> pd.DataFrame:
         reports = []
-        for path in self.report_paths:
-            report = pd.read_csv(path)
+        for arg in self.args:
+            report = pd.read_csv(arg)
             reports.append(report)
         df = pd.concat(reports, ignore_index=True)
         df = df[df["Description"].str.startswith("Gross interest")]
