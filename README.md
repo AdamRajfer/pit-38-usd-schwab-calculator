@@ -22,7 +22,7 @@ poetry install
 from pathlib import Path
 from polish_pit_calculator.schwab import SchwabEmployeeSponsoredTaxReporter
 
-report_path = Path("PATH_TO_YOUR_REPORT.csv")
+report_path = "PATH_TO_YOUR_REPORT.csv"
 tax_reporter = SchwabEmployeeSponsoredTaxReporter(report_path)
 tax_report = tax_reporter.generate()
 ```
