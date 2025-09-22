@@ -1,11 +1,8 @@
-from collections import defaultdict
 from datetime import date, datetime, timedelta
 from functools import partial
 
 import numpy as np
 from scipy.optimize import minimize
-
-from polish_pit_calculator.config import TaxReport
 
 
 class SavingsForTaxOptimizer:
@@ -27,18 +24,15 @@ class SavingsForTaxOptimizer:
 
     def fit(
         self,
-        tax_report: TaxReport,
+        tax: float,
+        year: int,
         savings: float,
         interest_rate: float,
     ) -> "SavingsForTaxOptimizer":
-        taxes: dict[date, float] = defaultdict(lambda: 0.0)
-        for year, tax_record in tax_report.items():
-            taxes[
-                date(year + 1, self.payment_month, self.payment_day)
-            ] += tax_record.total_tax
-        taxes[
-            date(max(taxes).year + 1, self.payment_month, self.payment_day)
-        ] = 0.0
+        taxes = {
+            date(year + 1, self.payment_month, self.payment_day): tax,
+            date(year + 2, self.payment_month, self.payment_day): 0.0,
+        }
         fun = partial(
             self._estimate_future_abs_savings,
             interest_rate=interest_rate,
