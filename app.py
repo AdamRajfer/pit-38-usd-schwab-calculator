@@ -14,18 +14,14 @@ from polish_pit_calculator.schwab import SchwabEmployeeSponsoredTaxReporter
 class App:
     def __init__(self) -> None:
         st.session_state.entries = st.session_state.get("entries", [])
-        st.session_state.reporter_name = st.session_state.get(
-            "reporter_name", self.reporter_name_placeholder
-        )
-        st.session_state.reporter_files = st.session_state.get(
-            "reporter_files", []
+        st.session_state.reporter_files_key = st.session_state.get(
+            "reporter_files_key", 0
         )
 
     def clear_all_section(self) -> None:
         if st.button("Clear All", disabled=not st.session_state.entries):
             st.session_state.entries.clear()
-            st.session_state.reporter_name = self.reporter_name_placeholder
-            st.session_state.reporter_files.clear()
+            st.session_state.reporter_files_key += 1
             st.rerun()
 
     def entries_section(
@@ -52,36 +48,47 @@ class App:
     def add_reporter_section(
         self, dg1: DeltaGenerator, dg2: DeltaGenerator, dg3: DeltaGenerator
     ) -> None:
+        reporter_files_key = (
+            f"reporter_files_{st.session_state.reporter_files_key}"
+        )
+        reporter_files = st.session_state.get(reporter_files_key, [])
+        reporter_name_key = (
+            f"reporter_name_{st.session_state.reporter_files_key}"
+        )
+        reporter_name = st.session_state.get(
+            reporter_name_key, self.reporter_name_placeholder
+        )
         with dg1:
             st.selectbox(
                 "Tax Reporter Type",
                 [self.reporter_name_placeholder, *self.reporter_name_to_cls],
-                key="reporter_name",
-                disabled=bool(st.session_state.reporter_files),
+                key=reporter_name_key,
+                disabled=bool(reporter_files),
             )
         with dg2:
             st.file_uploader(
                 "Add reports (min. 1)",
-                key="reporter_files",
+                key=reporter_files_key,
                 accept_multiple_files=True,
-                disabled=st.session_state.reporter_name
-                == self.reporter_name_placeholder,
+                disabled=reporter_name == self.reporter_name_placeholder,
             )
+        reporter_files = st.session_state.get(reporter_files_key, [])
+        reporter_name = st.session_state.get(
+            reporter_name_key, self.reporter_name_placeholder
+        )
         with dg3:
             if st.button(
                 "Submit",
-                disabled=st.session_state.reporter_name
-                == self.reporter_name_placeholder
-                or not st.session_state.reporter_files,
+                disabled=reporter_name == self.reporter_name_placeholder
+                or not reporter_files,
             ):
                 st.session_state.entries.append(
                     {
-                        "reporter_name": st.session_state.reporter_name,
-                        "reporter_files": st.session_state.reporter_files,
+                        "reporter_name": reporter_name,
+                        "reporter_files": reporter_files,
                     }
                 )
-                st.session_state.reporter_name = self.reporter_name_placeholder
-                st.session_state.reporter_files.clear()
+                st.session_state.reporter_files_key += 1
                 st.rerun()
 
     def summary_section(self) -> None:
