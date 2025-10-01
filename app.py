@@ -14,14 +14,12 @@ from polish_pit_calculator.schwab import SchwabEmployeeSponsoredTaxReporter
 class App:
     def __init__(self) -> None:
         st.session_state.entries = st.session_state.get("entries", [])
-        st.session_state.reporter_files_key = st.session_state.get(
-            "reporter_files_key", 0
-        )
+        st.session_state.reporter_key = st.session_state.get("reporter_key", 0)
 
     def clear_all_section(self) -> None:
         if st.button("Clear All", disabled=not st.session_state.entries):
             st.session_state.entries.clear()
-            st.session_state.reporter_files_key += 1
+            st.session_state.reporter_key += 1
             st.rerun()
 
     def entries_section(
@@ -48,13 +46,9 @@ class App:
     def add_reporter_section(
         self, dg1: DeltaGenerator, dg2: DeltaGenerator, dg3: DeltaGenerator
     ) -> None:
-        reporter_files_key = (
-            f"reporter_files_{st.session_state.reporter_files_key}"
-        )
+        reporter_files_key = f"reporter_files_{st.session_state.reporter_key}"
         reporter_files = st.session_state.get(reporter_files_key, [])
-        reporter_name_key = (
-            f"reporter_name_{st.session_state.reporter_files_key}"
-        )
+        reporter_name_key = f"reporter_name_{st.session_state.reporter_key}"
         reporter_name = st.session_state.get(
             reporter_name_key, self.reporter_name_placeholder
         )
@@ -88,7 +82,7 @@ class App:
                         "reporter_files": reporter_files,
                     }
                 )
-                st.session_state.reporter_files_key += 1
+                st.session_state.reporter_key += 1
                 st.rerun()
 
     def summary_section(self) -> None:
