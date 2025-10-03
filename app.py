@@ -89,6 +89,8 @@ class App:
             tax_report = TaxReport()
             for entry in st.session_state.entries:
                 tax_reporter_cls = App._NAME_TO_CLS[entry["name"]]
+                for f in entry["files"]:
+                    f.seek(0)
                 tax_reporter = tax_reporter_cls(*entry["files"])
                 tax_report += tax_reporter.generate()
             df = tax_report.to_dataframe()
