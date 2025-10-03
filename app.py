@@ -44,13 +44,13 @@ class App:
 
         if st.session_state.entries:
             st.markdown("---")
-            for i, x in enumerate(st.session_state.entries):
+            for i, entry in enumerate(st.session_state.entries):
                 dg1, dg2, dg3 = st.columns([0.4, 0.5, 0.1])
                 with dg1:
-                    st.markdown(f"**#{i + 1}** — {x['name']}")
+                    st.markdown(f"**#{i + 1}** — {entry['name']}")
                 with dg2:
                     st.markdown(
-                        "<br>".join(f"`{f.name}`" for f in x["files"]),
+                        "<br>".join(f"`{f.name}`" for f in entry["files"]),
                         unsafe_allow_html=True,
                     )
                 with dg3:
