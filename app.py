@@ -36,11 +36,31 @@ class App:
         st.session_state.entries = st.session_state.get("entries", [])
         st.session_state.table = st.session_state.get("table", None)
 
-        if st.session_state.entries or st.session_state.table is not None:
-            if st.button("Restart and Clear All"):
-                st.session_state.entries.clear()
-                st.session_state.table = None
-                st.rerun()
+        st.markdown("---")
+        name_key = f"name_{len(st.session_state.entries)}"
+        name = st.session_state.get(name_key, App._PLACEHOLDER)
+        files_key = f"files_{len(st.session_state.entries)}"
+        files = st.session_state.get(files_key, [])
+        disabled = bool(files)
+        st.selectbox(
+            "Tax Reporter",
+            [App._PLACEHOLDER, *App._NAME_TO_CLS],
+            key=name_key,
+            disabled=disabled,
+        )
+        name = st.session_state.get(name_key, App._PLACEHOLDER)
+        disabled = name == App._PLACEHOLDER
+        if not disabled:
+            st.file_uploader(
+                "Reports (min. 1)",
+                key=files_key,
+                accept_multiple_files=True,
+            )
+        files = st.session_state.get(files_key, [])
+        disabled = name == App._PLACEHOLDER or not files
+        if not disabled and st.button("Submit"):
+            st.session_state.entries.append({"name": name, "files": files})
+            st.rerun()
 
         if st.session_state.entries:
             st.markdown("---")
@@ -58,34 +78,17 @@ class App:
                         st.session_state.entries.pop(i)
                         st.rerun()
 
-        st.markdown("---")
-        name_key = f"name_{len(st.session_state.entries)}"
-        name = st.session_state.get(name_key, App._PLACEHOLDER)
-        files_key = f"files_{len(st.session_state.entries)}"
-        files = st.session_state.get(files_key, [])
-        disabled = bool(files)
-        st.selectbox(
-            "Tax Reporter",
-            [App._PLACEHOLDER, *App._NAME_TO_CLS],
-            key=name_key,
-            disabled=disabled,
-        )
-        name = st.session_state.get(name_key, App._PLACEHOLDER)
-        disabled = name == App._PLACEHOLDER
-        st.file_uploader(
-            "Reports (min. 1)",
-            key=files_key,
-            accept_multiple_files=True,
-            disabled=disabled,
-        )
-        files = st.session_state.get(files_key, [])
-        disabled = name == App._PLACEHOLDER or not files
-        if st.button("Submit", disabled=disabled):
-            st.session_state.entries.append({"name": name, "files": files})
+        if st.session_state.entries or st.session_state.table:
+            st.markdown("---")
+
+        if (st.session_state.entries or st.session_state.table) and st.button(
+            "Restart and Clear All"
+        ):
+            st.session_state.entries.clear()
+            st.session_state.table = None
             st.rerun()
 
-        st.markdown("---")
-        if st.button("Summarize"):
+        if st.session_state.entries and st.button("Summarize"):
             tax_report = TaxReport()
             for entry in st.session_state.entries:
                 tax_reporter_cls = App._NAME_TO_CLS[entry["name"]]
@@ -98,6 +101,7 @@ class App:
             st.session_state.table = rendered_df
 
         if st.session_state.table:
+            st.markdown("---")
             st.table(st.session_state.table)
 
         return self
