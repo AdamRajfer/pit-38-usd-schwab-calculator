@@ -118,22 +118,43 @@ class TaxRecord:
 
     def to_dict(self) -> dict[str, float]:
         return {
-            "Trade Revenue (PIT-38/C20)": self.trade_revenue,
-            "Trade Cost (PIT-38/C21)": self.trade_cost,
-            "Trade Loss from Previous Years (PIT-38/D28)": self.trade_loss_from_previous_years,
-            "Trade Loss (PIT-38/D28 - Next Year)": self.trade_loss,
-            "Crypto Revenue (PIT-38/E34)": self.crypto_revenue,
-            "Crypto Cost (PIT-38/E35)": self.crypto_cost,
-            "Crypto Cost Excess from Previous Years (PIT-38/E36)": self.crypto_cost_excess_from_previous_years,
-            "Crypto Cost Excess (PIT-38/E36 - Next Year)": self.crypto_cost_excess,
-            "Domestic Interest Tax (PIT-38/G44)": self.domestic_interest_tax,
-            "Foreign Interest Tax (PIT-38/G45)": self.foreign_interest_tax,
-            "Foreign Interest Withholding Tax (PIT-38/G46)": self.foreign_interest_withholding_tax,
-            "Employment Profit Deduction (PIT/O/B11 -> PIT-37/F124)": self.employment_profit_deduction,
-            "Total Profit (DSF-1/C18 - If Solidarity Tax > 0.00)": self.total_profit,
-            "Total Profit Deductions (DSF-1/C19 - If Solidarity Tax > 0.00)": self.total_profit_deductions,
+            "Trade Revenue": self.trade_revenue,
+            "Trade Cost": self.trade_cost,
+            "Trade Loss from Previous Years": self.trade_loss_from_previous_years,
+            "Trade Loss": self.trade_loss,
+            "Crypto Revenue": self.crypto_revenue,
+            "Crypto Cost": self.crypto_cost,
+            "Crypto Cost Excess from Previous Years": self.crypto_cost_excess_from_previous_years,
+            "Crypto Cost Excess": self.crypto_cost_excess,
+            "Domestic Interest Tax": self.domestic_interest_tax,
+            "Foreign Interest Tax": self.foreign_interest_tax,
+            "Foreign Interest Withholding Tax": self.foreign_interest_withholding_tax,
+            "Employment Profit Deduction": self.employment_profit_deduction,
+            "Total Profit": self.total_profit,
+            "Total Profit Deductions": self.total_profit_deductions,
             "Solidarity Tax": self.solidarity_tax,
             "Total Tax": self.total_tax,
+        }
+
+    @staticmethod
+    def get_name_to_pit_label_mapping() -> dict[str, str]:
+        return {
+            "Trade Revenue": "PIT-38/C20",
+            "Trade Cost": "PIT-38/C21",
+            "Trade Loss from Previous Years": "PIT-38/D28",
+            "Trade Loss": "PIT-38/D28 - Next Year",
+            "Crypto Revenue": "PIT-38/E34",
+            "Crypto Cost": "PIT-38/E35",
+            "Crypto Cost Excess from Previous Years": "PIT-38/E36",
+            "Crypto Cost Excess": "PIT-38/E36 - Next Year",
+            "Domestic Interest Tax": "PIT-38/G44",
+            "Foreign Interest Tax": "PIT-38/G45",
+            "Foreign Interest Withholding Tax": "PIT-38/G46",
+            "Employment Profit Deduction": "PIT/O/B11 -> PIT-37/F124",
+            "Total Profit": "DSF-1/C18 - If Solidarity Tax > 0.00",
+            "Total Profit Deductions": "DSF-1/C19 - If Solidarity Tax > 0.00",
+            "Solidarity Tax": "",
+            "Total Tax": "",
         }
 
     def __add__(self, other: "TaxRecord") -> "TaxRecord":
@@ -173,10 +194,19 @@ class TaxReport:
         return list(self.year_to_tax_record.items())
 
     def to_dataframe(self) -> pd.DataFrame:
-        return pd.DataFrame.from_dict(
-            {k: v.to_dict() for k, v in self.items()},
-            orient="index",
-        ).T.sort_index(axis=1)
+        pit_label_df = pd.Series(
+            TaxRecord.get_name_to_pit_label_mapping(),
+            name="PIT",
+        ).to_frame()
+        df = (
+            pd.DataFrame.from_dict(
+                {k: v.to_dict() for k, v in self.items()},
+                orient="index",
+            )
+            .T.sort_index(axis=1)
+            .map("{:,.2f}".format)
+        )
+        return pit_label_df.join(df)
 
 
 class TaxReporter(ABC):

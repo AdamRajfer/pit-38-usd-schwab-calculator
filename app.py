@@ -3,6 +3,7 @@ from datetime import date
 from enum import Enum, auto
 from typing import Any, Type, cast
 
+import pandas as pd
 import streamlit as st
 
 from polish_pit_calculator.coinbase import CoinbaseTaxReporter
@@ -281,15 +282,18 @@ def display_tax_report_entries() -> None:
         with dg2:
             match tax_report_entry.tax_report_enum.to_type().value:
                 case TaxReportType.FILES.value:
-                    st.markdown(
-                        "<br>".join(
-                            f"`{f.name}`"
-                            for f in tax_report_entry.tax_report_data
-                        ),
-                        unsafe_allow_html=True,
+                    series = pd.Series(
+                        [f.name for f in tax_report_entry.tax_report_data],
+                        name="Uploaded Files",
                     )
+                    st.dataframe(series, hide_index=True)
                 case TaxReportType.MANUAL.value:
-                    st.markdown(str(tax_report_entry.tax_report_data))
+                    tax_data = tax_report_entry.tax_report_data["tax_data"]
+                    series = pd.Series(
+                        tax_data,
+                        name=str(tax_report_entry.tax_report_data["year"]),
+                    ).apply(lambda x: f"{x:,.2f}")
+                    st.dataframe(series)
                 case _ as unknown:
                     raise ValueError(f"Unknown TaxReportType value: {unknown}")
         with dg3:
@@ -318,8 +322,7 @@ def summarize_tax_reports() -> None:
                 raise ValueError(f"Unknown TaxReportType value: {unknown}")
         tax_report += tax_reporter.generate()
     df = tax_report.to_dataframe()
-    rendered_df = df.style.format("{:,.2f}")
-    st.session_state.table = rendered_df
+    st.session_state.table = df
 
 
 def main() -> None:
@@ -342,9 +345,9 @@ def main() -> None:
         st.markdown("</br>", unsafe_allow_html=True)
         if st.button("Summarize"):
             summarize_tax_reports()
-    if st.session_state.table:
+    if st.session_state.table is not None:
         st.markdown("</br>", unsafe_allow_html=True)
-        st.table(st.session_state.table)
+        st.dataframe(st.session_state.table)
 
 
 if __name__ == "__main__":

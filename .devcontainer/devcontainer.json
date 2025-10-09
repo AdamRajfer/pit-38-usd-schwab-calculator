@@ -9,5 +9,5 @@
     "workspaceFolder": "${localWorkspaceFolder}",
     "initializeCommand": "bash .devcontainer/startup.sh",
     "onCreateCommand": "pip install pre-commit poetry && pre-commit install && poetry install",
-    "image": "python:3---devcontainer"
+    "image": "python:3.13---devcontainer"
 }
